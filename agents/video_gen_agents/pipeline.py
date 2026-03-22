@@ -8,7 +8,9 @@ from langgraph.graph import END, START, StateGraph
 from typing import Any, Callable, Literal
 from uuid import uuid4
 
+from .archetypes import build_from_archetype, detect_archetype, extract_topic
 from .config import Settings
+from .layouts import build_layouts_v2
 from .llm import build_groq_chat_model, groq_is_configured
 from .models import (
     AgentLogEntry,
@@ -667,6 +669,10 @@ def _build_layouts(
 
 
 def _build_motion(layouts: list[SceneLayout], theme: ThemeTokens) -> list[MotionScenePlan]:
+    # Transition variety: cycle through types based on scene position
+    ENTER_TRANSITIONS = ["fade", "slide-left", "zoom", "cross-dissolve", "slide-up", "blur-in"]
+    EXIT_TRANSITIONS = ["fade", "slide-left", "zoom", "cross-dissolve", "slide-up", "blur-in"]
+
     motion: list[MotionScenePlan] = []
     for scene_index, layout in enumerate(layouts):
         element_motions: list[ElementMotion] = []
@@ -718,16 +724,27 @@ def _build_motion(layouts: list[SceneLayout], theme: ThemeTokens) -> list[Motion
                 )
             )
 
+        # Pick varied transitions
+        if scene_index == 0:
+            trans_in_type = "fade"
+        else:
+            trans_in_type = ENTER_TRANSITIONS[scene_index % len(ENTER_TRANSITIONS)]
+
+        if scene_index == len(layouts) - 1:
+            trans_out_type = "fade"
+        else:
+            trans_out_type = EXIT_TRANSITIONS[(scene_index + 1) % len(EXIT_TRANSITIONS)]
+
         motion.append(
             MotionScenePlan(
                 scene_id=layout.scene_id,
                 transition_in=TransitionConfig(
-                    type="fade" if scene_index == 0 else "slide-left",
-                    duration=0.4,
+                    type=trans_in_type,
+                    duration=0.45,
                     easing=theme.motion.easing_enter,
                 ),
                 transition_out=TransitionConfig(
-                    type="fade" if scene_index == len(layouts) - 1 else "slide-left",
+                    type=trans_out_type,
                     duration=0.35,
                     easing=theme.motion.easing_exit,
                 ),
@@ -1033,11 +1050,27 @@ class VideoGenerationService:
                 storyboard = [StoryboardScene(**s) for s in parsed["storyboard"]]
                 msg = f"Generated {len(script.beats)} beats and storyboard scenes using Groq LLM."
             except Exception as e:
-                script, storyboard = _build_script_and_storyboard(state["request"], constraints)
-                msg = f"Generated {len(script.beats)} beats and storyboard scenes (LLM fallback)."
+                archetype = detect_archetype(state['request'].brief)
+                title = state['request'].title or _derive_title(state['request'].brief)
+                beats_list, storyboard = build_from_archetype(
+                    archetype_name=archetype,
+                    brief=state['request'].brief,
+                    title=title,
+                    total_duration=constraints.duration,
+                )
+                script = Script(beats=beats_list)
+                msg = f"Generated {len(script.beats)} beats [{archetype}] (LLM fallback)."
         else:
-            script, storyboard = _build_script_and_storyboard(state["request"], constraints)
-            msg = f"Generated {len(script.beats)} beats and storyboard scenes."
+            archetype = detect_archetype(state['request'].brief)
+            title = state['request'].title or _derive_title(state['request'].brief)
+            beats_list, storyboard = build_from_archetype(
+                archetype_name=archetype,
+                brief=state['request'].brief,
+                title=title,
+                total_duration=constraints.duration,
+            )
+            script = Script(beats=beats_list)
+            msg = f"Generated {len(script.beats)} beats [{archetype}] and storyboard scenes."
 
         agent_logs = _append_log(
             state,
@@ -1093,11 +1126,11 @@ class VideoGenerationService:
                 msg = f"Created {len(layouts)} scene layouts using Groq LLM."
             except Exception as e:
                 print(f"Designer LLM Error: {str(e)}")
-                layouts = _build_layouts(state["storyboard"], state["script"], theme)
-                msg = f"Created {len(layouts)} scene layouts (LLM fallback)."
+                layouts = build_layouts_v2(state["storyboard"], state["script"].beats, theme)
+                msg = f"Created {len(layouts)} scene layouts (LLM fallback, v2 engine)."
         else:
-            layouts = _build_layouts(state["storyboard"], state["script"], theme)
-            msg = f"Created {len(layouts)} scene layouts."
+            layouts = build_layouts_v2(state["storyboard"], state["script"].beats, theme)
+            msg = f"Created {len(layouts)} scene layouts (v2 engine)."
 
         agent_logs = _append_log(
             state,
