@@ -1,0 +1,26 @@
+{
+  "name": "@video-generation/remotion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Remotion renderer for the Video Generation System",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "render:sample": "remotion render src/index.ts VideoFromIR out/sample.mp4",
+    "render:ir": "remotion render src/index.ts VideoFromIR",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.438",
+    "@remotion/renderer": "4.0.438",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.438",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.5.2",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

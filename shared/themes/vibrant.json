@@ -1,0 +1,45 @@
+{
+  "colors": {
+    "bg_primary": "#FFF8F0",
+    "bg_secondary": "#FFF0E0",
+    "fg_primary": "#1A1A2E",
+    "fg_secondary": "#4A4A6A",
+    "accent_1": "#FF6B6B",
+    "accent_2": "#4ECDC4",
+    "accent_3": "#FFE66D",
+    "gradient_start": "#FF6B6B",
+    "gradient_end": "#4ECDC4",
+    "surface": "#FFFFFF",
+    "border": "#E8E0D8"
+  },
+  "typography": {
+    "display_lg": { "family": "Inter", "weight": 800, "size": 72, "lineHeight": 1.1 },
+    "display_md": { "family": "Inter", "weight": 700, "size": 56, "lineHeight": 1.15 },
+    "display_sm": { "family": "Inter", "weight": 700, "size": 40, "lineHeight": 1.2 },
+    "heading_lg": { "family": "Inter", "weight": 600, "size": 32, "lineHeight": 1.3 },
+    "heading_md": { "family": "Inter", "weight": 600, "size": 24, "lineHeight": 1.35 },
+    "body_lg": { "family": "Inter", "weight": 400, "size": 20, "lineHeight": 1.5 },
+    "body_md": { "family": "Inter", "weight": 400, "size": 16, "lineHeight": 1.5 },
+    "caption": { "family": "Inter", "weight": 400, "size": 14, "lineHeight": 1.4 },
+    "code": { "family": "JetBrains Mono", "weight": 400, "size": 16, "lineHeight": 1.5 }
+  },
+  "motion": {
+    "duration_fast": 0.25,
+    "duration_normal": 0.5,
+    "duration_slow": 0.9,
+    "duration_very_slow": 1.4,
+    "easing_default": "ease-out",
+    "easing_enter": "ease-out",
+    "easing_exit": "ease-in",
+    "easing_bounce": "cubic-bezier(0.68, -0.6, 0.32, 1.6)",
+    "easing_spring": { "mass": 1, "damping": 10, "stiffness": 170 },
+    "stagger_delay": 0.1
+  },
+  "layout": {
+    "padding": 64,
+    "gap": 28,
+    "card_radius": 20,
+    "safe_area_x": 120,
+    "safe_area_y": 80
+  }
+}

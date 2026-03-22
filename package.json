@@ -1,0 +1,8 @@
+{
+  "name": "video-generation-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-agent AI video generation system",
+  "scripts": {},
+  "keywords": ["video", "ai", "agents", "remotion"]
+}
