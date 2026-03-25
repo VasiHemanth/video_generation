@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
+import asyncio
 from langgraph.graph import END, START, StateGraph
 from typing import Any, Callable, Dict, List, Optional, Union, cast, Literal
 from uuid import uuid4
@@ -20,6 +21,8 @@ from .llm import (
     get_langfuse_callback,
     build_resilient_model,
 )
+import structlog
+logger = structlog.get_logger(__name__)
 from .models import (
     AgentLogEntry,
     AnimationConfig,
@@ -222,6 +225,19 @@ def _extract_json_with_retry(
             print(f"LLM JSON extraction failed (attempt {attempt + 1}/{retries + 1}): {last_error}")
             
     raise ValueError(f"Failed to generate valid JSON after {retries + 1} attempts. Last error: {last_error}")
+
+
+def _extract_json_text(text: str) -> str:
+    """Extracts the first JSON object or array from a string."""
+    clean = text.strip().strip("`").removeprefix("json").strip()
+    try:
+        json.loads(clean)
+        return clean
+    except json.JSONDecodeError:
+        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        if match:
+            return match.group(1)
+        raise ValueError("No JSON object could be extracted from the response.")
 
 
 def _run_voice_generation(
@@ -908,17 +924,17 @@ class VideoGenerationService:
     def available_themes(self) -> list[str]:
         return list_theme_names(self.settings)
 
-    def generate(
+    async def generate(
         self,
-        request: GenerateVideoRequest,
-        project_id: str | None = None,
-        progress_callback: Callable[[ProjectProgressEvent], None] | None = None,
+        payload: GenerateVideoRequest,
+        project_id: str,
+        progress_callback: Optional[Callable[[ProjectProgressEvent], None]] = None,
         checkpoint_callback: Callable[[str, str, dict], None] | None = None,
     ) -> GenerateVideoResponse:
         project_id = project_id or f"proj_{uuid4().hex[:8]}"
         initial_state: VideoAgentState = {
             "project_id": project_id,
-            "request": request,
+            "request": payload,
             "agent_logs": [],
         }
         if progress_callback is not None:
@@ -942,7 +958,7 @@ class VideoGenerationService:
                 "langfuse_tags": [project_id]
             }
         } if callbacks else {}
-        state = self.graph.invoke(initial_state, config=config)
+        state = await self.graph.ainvoke(initial_state, config=config)
         return GenerateVideoResponse(
             project_id=project_id,
             ir_path=state["ir_path"],
@@ -999,7 +1015,7 @@ class VideoGenerationService:
 
         callback(state["project_id"], step_name, _json_safe(snapshot))
 
-    def _manager_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _manager_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         request = state["request"]
         _emit_progress(
             state,
@@ -1065,7 +1081,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "manager", ["plan", "constraints"])
         return res
 
-    def _script_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _script_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1173,7 +1189,115 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "scriptwriter", ["script", "storyboard"])
         return res
 
-    def _design_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _design_scene(
+        self, 
+        scene: StoryboardScene, 
+        theme: ThemeTokens, 
+        config: RunnableConfig
+) -> SceneLayout:
+        """Process a single scene layout with LLM design logic."""
+        model = build_resilient_model(self.settings, temperature=0.7)
+        prompt = (
+            "You are a Motion Graphics Designer. Create a professional layout for this specific video scene.\n\n"
+            f"Scene Description: {scene.description}\n"
+            f"Role: {scene.role}\n"
+            f"Duration: {scene.duration}s\n"
+            f"Theme Context: {theme.name} ({json.dumps(theme.colors.model_dump())})\n\n"
+            "Return ONLY a JSON object matching this schema:\n"
+            "{\n"
+            '  "scene_id": "' + scene.scene_id + '",\n'
+            '  "background": { "type": "gradient"|"animated-gradient"|"solid", "colors": ["bg_primary", "surface"], "angle": 120 },\n'
+            '  "elements": [\n'
+            '    { "id": "headline", "type": "text", "props": { "content": "...", "style_token": "display_md", "color": "fg_primary", "align": "center" }, "position": { "x": "50%", "y": "40%" }, "layer": 1 }\n'
+            '  ]\n'
+            "}\n"
+            "Rules: Use theme token names like 'accent_1', 'bg_primary'. Layers must be unique (1, 2, 3...)."
+        )
+        
+        try:
+            # We use a wrapper with healing logic (implemented below)
+            parsed = await self._extract_json_with_healing(
+                model, 
+                prompt, 
+                expected_type=SceneLayout,
+                config=config
+            )
+            return parsed
+        except Exception as e:
+            logger.error("Per-scene Design Fallback", scene_id=scene.scene_id, error=str(e))
+            # Default fallback for this specific scene
+            return build_layouts_v2([scene], [], theme)[0]
+
+    async def _motion_scene(
+        self, 
+        layout: SceneLayout, 
+        theme: ThemeTokens, 
+        config: RunnableConfig
+) -> MotionScenePlan:
+        """Process a single scene motion plan with LLM logic."""
+        model = build_resilient_model(self.settings, temperature=0.3)
+        prompt = (
+            "You are a Motion Effects Artist. Add spring animations and transitions to this scene layout.\n\n"
+            f"Layout: {json.dumps(layout.model_dump(), indent=2)}\n\n"
+            "Return ONLY a JSON object matching this schema:\n"
+            "{\n"
+            '  "scene_id": "' + layout.scene_id + '",\n'
+            '  "transition_in": { "type": "fade"|"zoom"|"slide-left", "duration": 0.4 },\n'
+            '  "transition_out": { "type": "fade", "duration": 0.3 },\n'
+            '  "elements": [{ "element_id": "headline", "enter": { "type": "spring"|"slide-up", "duration": 0.5 } }]\n'
+            "}\n"
+        )
+        
+        try:
+            parsed = await self._extract_json_with_healing(
+                model, 
+                prompt, 
+                expected_type=MotionScenePlan,
+                config=config
+            )
+            return parsed
+        except Exception as e:
+            logger.error("Per-scene Motion Fallback", scene_id=layout.scene_id, error=str(e))
+            return _build_motion([layout], theme)[0]
+
+    async def _extract_json_with_healing(
+        self, 
+        model: Any, 
+        prompt: str, 
+        expected_type: Any,
+        config: RunnableConfig,
+        max_heals: int = 1
+    ) -> Any:
+        """Extracts JSON and attempts to heal schema validation errors using the LLM."""
+        current_prompt = prompt
+        
+        for attempt in range(max_heals + 1):
+            try:
+                # Use the resilient router's ainvoke (which now has semaphores)
+                response = await model.ainvoke(current_prompt, config=config)
+                content = response.content if hasattr(response, "content") else str(response)
+                
+                # Use existing JSON extractor (assumed to be available as _extract_json_from_text)
+                # For this implementation, I'll use the logic from _extract_json_with_retry but async
+                json_str = _extract_json_text(content)
+                data = json.loads(json_str)
+                
+                # Pydantic validation
+                return expected_type(**data)
+                
+            except Exception as e:
+                if attempt < max_heals:
+                    logger.warning("Healing triggered", attempt=attempt, error=str(e))
+                    current_prompt = (
+                        f"{prompt}\n\n"
+                        "### PREVIOUS ATTEMPT ERRORED ###\n"
+                        f"Your previous output triggered this validation error: {str(e)}\n"
+                        "Please fix the schema mismatch and return the CORRECT JSON object."
+                    )
+                    continue
+                raise e
+
+    async def _design_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1184,28 +1308,17 @@ class VideoGenerationService:
         )
 
         theme = load_theme(state["request"].theme_name, self.settings)
-        model = build_resilient_model(self.settings, temperature=0.7)
-        if model:
-            try:
-                # Design agent prompt - maps storyboard to layouts
-                prompt = (
-                    "Create layouts for these scenes using the theme colors.\n"
-                    f"Storyboard: {json.dumps([s.model_dump() for s in state['storyboard']], indent=2)}\n"
-                    f"Theme: {theme.name}\n"
-                    "Return ONLY JSON and NO other text: { \"layouts\": [{ \"scene_id\": string, \"background\": object, \"elements\": [{ \"id\": string, \"type\": string, \"props\": object, \"position\": object, \"anchor\": string, \"layer\": integer }] }] }\n"
-                    "Rules: Unique layers 1, 2, 3... use theme colors like 'accent_1'."
-                )
-                parsed = _extract_json_with_retry(model, prompt, config=config)
-                print(f"DEBUG DESIGNER RESPONSE: JSON extracted successfully")
-                layouts = [SceneLayout(**l) for l in parsed["layouts"]]
-                msg = f"Created {len(layouts)} scene layouts using Groq LLM."
-            except Exception as e:
-                print(f"Designer LLM Error: {str(e)}")
-                layouts = build_layouts_v2(state["storyboard"], state["script"].beats, theme)
-                msg = f"Created {len(layouts)} scene layouts (LLM fallback, v2 engine)."
-        else:
+        
+        # Parallel Execution for Designing Scenes
+        tasks = [self._design_scene(s, theme, config) for s in state["storyboard"]]
+        
+        try:
+            layouts = await asyncio.gather(*tasks)
+            msg = f"Created {len(layouts)} scene layouts in parallel using Resilient LLM Router."
+        except Exception as e:
+            logger.error("Parallel Design Node Failed", error=str(e))
             layouts = build_layouts_v2(state["storyboard"], state["script"].beats, theme)
-            msg = f"Created {len(layouts)} scene layouts (v2 engine)."
+            msg = f"Created {len(layouts)} scene layouts (Node fallback, v2 engine)."
 
         agent_logs = _append_log(
             state,
@@ -1232,7 +1345,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "designer", ["theme", "layouts"])
         return res
 
-    def _motion_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _motion_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1243,36 +1356,17 @@ class VideoGenerationService:
         )
 
         theme = state["theme"]
-        model = build_resilient_model(self.settings, temperature=0.3)
-        if model:
-            try:
-                # Motion agent prompt - plans animations
-                prompt = (
-                    "Add spring-based motion to these layouts.\n"
-                    f"Layouts: {json.dumps([l.model_dump() for l in state['layouts']], indent=2)}\n\n"
-                    "Requirement: Return ONLY a JSON object with 'motion_plan' list.\n"
-                    "Structure: {\n"
-                    '  "motion_plan": [\n'
-                    '    {\n'
-                    '       "scene_id": string,\n'
-                    '       "transition_in": { "type": "fade"|"zoom"|"blur-in"|"slide-left"|"cross-dissolve", "duration": 0.4 },\n'
-                    '       "transition_out": { "type": "fade"|"blur-in", "duration": 0.3 },\n'
-                    '       "elements": [{ "element_id": string, "enter": { "type": "spring"|"slide-up", "duration": 0.5 } }]\n'
-                    '    }\n'
-                    '  ]\n'
-                    "}\n"
-                )
-                parsed = _extract_json_with_retry(model, prompt, config=config)
-                print(f"DEBUG MOTION RESPONSE: JSON extracted successfully")
-                motion_plan = [MotionScenePlan(**m) for m in parsed["motion_plan"]]
-                msg = f"Applied motion plans for {len(motion_plan)} scenes (with transitions) using Groq LLM."
-            except Exception as e:
-                print(f"Motion LLM Error: {str(e)}")
-                motion_plan = _build_motion(state["layouts"], theme)
-                msg = "Applied motion plans (LLM fallback)."
-        else:
+        
+        # Parallel Execution for Motion Planning
+        tasks = [self._motion_scene(l, theme, config) for l in state["layouts"]]
+
+        try:
+            motion_plan = await asyncio.gather(*tasks)
+            msg = f"Applied {len(motion_plan)} motion plans in parallel using Resilient LLM Router."
+        except Exception as e:
+            logger.error("Parallel Motion Node Failed", error=str(e))
             motion_plan = _build_motion(state["layouts"], theme)
-            msg = "Applied motion plans."
+            msg = "Applied motion plans (Node fallback)."
 
         agent_logs = _append_log(
             state,
@@ -1298,7 +1392,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "motion", ["motion_plan"])
         return res
 
-    def _audio_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _audio_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1334,7 +1428,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "audio", ["audio_plan"])
         return res
 
-    def _voice_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _voice_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1384,7 +1478,7 @@ class VideoGenerationService:
             "agent_logs": agent_logs,
         }
 
-    def _render_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _render_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         request = state["request"]
         _emit_progress(
             state,
@@ -1498,7 +1592,7 @@ class VideoGenerationService:
             "agent_logs": agent_logs,
         }
 
-    def _verify_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
+    async def _verify_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",

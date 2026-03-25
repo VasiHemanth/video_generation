@@ -142,6 +142,16 @@ def build_resilient_model(
     primary = build_cerebras_chat_model(settings, temperature=temperature)
     secondary = build_groq_chat_model(settings, temperature=temperature)
     
+    # Debug logs for test environment
+    if not primary and not secondary:
+        logger.error("❌ No LLM providers configured! (Check API keys)", 
+                     cerebras=bool(settings.cerebras_api_key),
+                     groq=bool(settings.groq_api_key))
+    elif not primary:
+        logger.info("⚠️ Cerebras not configured, using Groq as primary.")
+    elif not secondary:
+        logger.info("⚠️ Groq not configured, using Cerebras only.")
+    
     if primary and secondary:
         return ChatModelRouter(
             primary_model=primary,

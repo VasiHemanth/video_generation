@@ -85,8 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             broker.publish_threadsafe(loop, event)
 
         try:
-            response = await run_in_threadpool(
-                service.generate,
+            response = await service.generate(
                 payload,
                 project_id,
                 progress_callback,
@@ -194,7 +193,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         project_id = f"proj_{uuid4().hex[:8]}"
         await database.create_project(project_id, payload)
         try:
-            response = await run_in_threadpool(service.generate, payload, project_id)
+            response = await service.generate(payload, project_id)
         except ValueError as exc:
             await database.mark_project_failed(
                 project_id=project_id,

@@ -1,11 +1,15 @@
+import asyncio
+import threading
 import structlog
 import time
-from typing import Any, List, Optional, Dict, Union
+from typing import Any, List, Optional, Dict, Union, ClassVar
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatResult
 from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import CallbackManagerForLLMRun
+
+logger = structlog.get_logger(__name__)
 
 logger = structlog.get_logger(__name__)
 
@@ -18,6 +22,26 @@ class ChatModelRouter(BaseChatModel):
     primary_model: BaseChatModel
     fallback_models: List[BaseChatModel]
     max_retries_per_model: int = 2
+    
+    # Global semaphores to enforce limits across all router instances
+    _async_semaphores: ClassVar[Dict[str, asyncio.Semaphore]] = {}
+    _sync_semaphores: ClassVar[Dict[str, threading.Semaphore]] = {}
+    _lock: ClassVar[threading.Lock] = threading.Lock()
+    
+    def _get_async_semaphore(self, provider: str) -> asyncio.Semaphore:
+        with self._lock:
+            if provider not in self._async_semaphores:
+                # Cerebras: 3, Groq: 1 (Free tier limits)
+                limit = 3 if provider == "cerebras" else 1 if provider == "groq" else 5
+                self._async_semaphores[provider] = asyncio.Semaphore(limit)
+        return self._async_semaphores[provider]
+
+    def _get_sync_semaphore(self, provider: str) -> threading.Semaphore:
+        with self._lock:
+            if provider not in self._sync_semaphores:
+                limit = 3 if provider == "cerebras" else 1 if provider == "groq" else 5
+                self._sync_semaphores[provider] = threading.Semaphore(limit)
+        return self._sync_semaphores[provider]
     
     @property
     def _llm_type(self) -> str:
@@ -63,7 +87,9 @@ class ChatModelRouter(BaseChatModel):
                             attempt=attempt
                         )
 
-                    return model.invoke(input, config=new_config, **kwargs)
+                    semaphore = self._get_sync_semaphore(provider_name)
+                    with semaphore:
+                        return model.invoke(input, config=new_config, **kwargs)
                 
                 except Exception as e:
                     last_exception = e
@@ -109,7 +135,9 @@ class ChatModelRouter(BaseChatModel):
                     })
                     new_config["metadata"] = new_metadata
                     
-                    return await model.ainvoke(input, config=new_config, **kwargs)
+                    semaphore = self._get_async_semaphore(provider_name)
+                    async with semaphore:
+                        return await model.ainvoke(input, config=new_config, **kwargs)
                 
                 except Exception as e:
                     last_exception = e
