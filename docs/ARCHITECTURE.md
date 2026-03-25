@@ -42,12 +42,16 @@ A LangGraph-powered multi-agent system that transforms natural-language briefs i
                     │  │                     END ◄┘ ──► retry  │  │
                     │  └────────────────────────────────────────┘  │
                     │                                              │
-                    │  ┌──────────┐  ┌───────────┐                │
-                    │  │ SQLite   │  │ Groq LLM  │                │
-                    │  │ (state)  │  │ (pluggable)│                │
-                    │  └──────────┘  └───────────┘                │
-                    └──────────────────┬───────────────────────────┘
-                                       │ writes IR JSON
+                    │  ┌──────────┐  ┌───────────┐  ┌───────────┐ │
+                    │  │ SQLite   │  │ Cerebras  │  │ Groq LLM  │ │
+                    │  │ (state)  │  │ (Primary) │  │ (Fallback)│ │
+                    │  └──────────┘  └─────┬─────┘  └─────┬─────┘ │
+                    │                      │              │       │
+                    │                ┌─────▼──────────────▼─────┐ │
+                    │                │    Fallback Router       │ │
+                    │                └─────────────┬────────────┘ │
+                    └──────────────────────────────┼──────────────┘
+                                                   │ writes IR JSON
                     ┌──────────────────▼───────────────────────────┐
                     │           Remotion Project (TS/React)         │
                     │  ┌─────────────────────────────────────────┐ │
@@ -75,7 +79,8 @@ A LangGraph-powered multi-agent system that transforms natural-language briefs i
 | Component | Language | Responsibility | Owns |
 |-----------|----------|---------------|------|
 | **FastAPI Backend** | Python | API, WebSocket, orchestration | Project CRUD, job management |
-| **LangGraph Agents** | Python | AI-driven creative pipeline | IR generation, plan DAG |
+| **LangGraph Agents** | Python | AI creativo pipeline + Observability | IR generation, Langfuse tracing |
+| **Fallback Router** | Python | Multi-provider resiliency | 429 Error detection, model switching |
 | **Remotion Project** | TypeScript | Animation rendering | Component tree, frame output |
 | **FFmpeg** | CLI | Video post-processing | Final MP4 encoding |
 | **Dashboard** | TypeScript | User interface | Project management, preview |
@@ -103,8 +108,15 @@ sequenceDiagram
     API->>LG: Start pipeline (brief, constraints)
 
     loop Each Agent Step
-        LG->>LLM: Prompt with context + IR section
-        LLM-->>LG: Structured JSON response
+        LG->>Router: Invoke model
+        Router->>Primary: Try Primary (Cerebras)
+        Primary-->>Router: Result OR 429
+        alt is 429
+            Router->>Fallback: Try Fallback (Groq)
+            Fallback-->>Router: Result
+        end
+        Router-->>LG: Final content
+        LG->>Langfuse: Log Trace/Span
         LG->>DB: Save agent log
         LG-->>API: WebSocket event (agent progress)
         API-->>U: WebSocket push (real-time update)

@@ -14,21 +14,21 @@ Brief → [LangGraph Agents] → Video IR → [Remotion] → [FFmpeg] → MP4
 2. **Script & Storyboard** — Generates narrative beats and scene breakdown
 3. **Visual Design** — Creates theme tokens and per-scene layouts
 4. **Motion & Physics** — Designs animations, keyframes, and transitions
-5. **Audio & SFX** — Plans music, SFX, and voiceover (Phase 2)
-6. **Renderer** — Assembles IR, triggers Remotion + FFmpeg
-7. **Verifier** — Validates output, routes failures for retry
+5. **Renderer** — Assembles IR, triggers Remotion + FFmpeg
+6. **Verifier** — Validates output, routes failures for retry
+7. **Router (New)** — Managed resilient fallback between Cerebras and Groq
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Agent Orchestration | LangGraph (Python) |
-| LLM | Groq / Llama 3.3 70B |
+| LLM | Cerebras (Qwen 3 235B) + Groq Fallback |
 | Backend API | FastAPI + SQLite |
 | Video Rendering | Remotion (React/TS) |
 | Post-Processing | FFmpeg |
 | Dashboard | Vite + React |
-| Observability | Galileo (Evaluation & Tracing) |
+| Observability | Langfuse (Distributed Tracing) |
 
 ## Project Structure
 

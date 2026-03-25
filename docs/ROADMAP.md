@@ -18,7 +18,9 @@
 | 1.4 | Remotion Pipeline | 🚧 In Progress | The `remotion/` package can load typed IR, resolve composition metadata, list compositions, and render a sample MP4; scene coverage and backend integration are still expanding |
 | 1.5 | FastAPI Backend | 🚧 In Progress | FastAPI app, health/theme/generate/project endpoints, async project launch, SQLite-backed project persistence, static media mounts for MP4/IR artifacts, WebSocket progress streaming, backend tests, and Remotion-backed MP4 rendering are implemented; update/delete flows are still missing |
 | 1.6 | Dashboard MVP | 🚧 In Progress | Vite + React dashboard can launch runs in the background, subscribe to project WebSockets, display a stage graph, inspect logs/verification/IR, and play rendered MP4s; update/delete flows and broader project management controls are still missing |
-| 1.7 | E2E Integration | 🚧 In Progress | Manual brief → IR → Remotion → FFmpeg → MP4 smoke runs now work locally with persisted project records; automated end-to-end checks are still missing |
+| 1.7 | E2E Integration | ✅ Complete | Manual brief → IR → Remotion → FFmpeg → MP4 smoke runs work locally. |
+| 1.8 | LLM Resiliency | ✅ Complete | Cerebras + Groq fallback router with 429 retries. |
+| 1.9 | Observability | ✅ Complete | Langfuse integration for distributed tracing and session tracking. |
 
 ### Tier 1 Visual Capabilities (Phase 1)
 - Kinetic typography (word-by-word, char-by-char reveals)
@@ -48,7 +50,9 @@
 | Tier 2 Visuals | P1 | SVG illustrations, icon compositions, diagram scenes |
 | Advanced Motion | P1 | Parallax, camera simulation, depth layers |
 | Scene Templates | P2 | Pre-designed scene archetypes (comparison, list, timeline) |
-| Error Recovery | P1 | Improved healer loop with detailed diagnostics |
+| Scene Parallelization | P0 | Parallel execution of independent agent nodes |
+| Error Recovery v2 | P1 | Self-healing loops for schema validation errors |
+| Audio & SFX Agent | P0 | Full audio planning: music selection, SFX placement |
 
 ### Tier 2 Visual Capabilities
 - SVG icon compositions and illustrations

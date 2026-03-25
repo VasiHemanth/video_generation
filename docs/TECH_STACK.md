@@ -5,8 +5,9 @@
 | Layer | Technology | Version | Rationale |
 |-------|-----------|---------|-----------|
 | **Agent Orchestration** | LangGraph | latest | DAG-based agent pipelines, built-in state management, conditional routing |
-| **LLM Provider** | Groq API | — | Fast inference, Llama 3.3 70B, pluggable to any provider |
-| **LLM Model** | llama-3.3-70b-versatile | — | Strong JSON output, good reasoning, fast via Groq |
+| **LLM Providers** | Cerebras (Primary) + Groq (Fallback) | — | Multi-provider fallback for high reliability |
+| **Reasoning Model**| Qwen 3 235B / Llama 3.3 70B | — | Top-tier reasoning for complex Video IR |
+| **Observability** | Langfuse | v4 | Distributed tracing, session tracking, cost monitoring |
 | **Backend API** | FastAPI | 0.115+ | Async, WebSocket support, automatic OpenAPI docs |
 | **Database** | SQLite | 3.x | Zero-config, local-first, sufficient for single-user |
 | **ORM** | SQLAlchemy | 2.0+ | Async support, model definitions, migrations |
@@ -40,7 +41,9 @@ python-dotenv>=1.0.0      # Environment variable loading
 langgraph>=0.2.0          # Agent orchestration framework
 langchain-core>=0.3.0     # LangChain base abstractions
 langchain-groq>=0.2.0     # Groq LLM integration
-langsmith>=0.1.0          # Tracing and observability (optional)
+langchain-cerebras>=0.1.0 # Cerebras LLM integration
+langfuse>=2.0.0           # Distributed tracing
+langsmith>=0.1.0          # Tracing (optional/legacy)
 ```
 
 ### Utilities
@@ -122,10 +125,11 @@ pytest-cov>=5.0.0
 ```bash
 # .env (agents/)
 GROQ_API_KEY=gsk_...                # Required: Groq API key
+CEREBRAS_API_KEY=csk_...            # Required: Cerebras API key
+LANGFUSE_SECRET_KEY=sk-lf-...       # Required: Langfuse Secret
+LANGFUSE_PUBLIC_KEY=pk-lf-...       # Required: Langfuse Public
+LANGFUSE_BASE_URL=https://...       # Required: Langfuse Base URL
 DATABASE_URL=sqlite:///./data/app.db # SQLite database path
-REMOTION_PROJECT_PATH=../remotion    # Path to Remotion project
-RENDER_OUTPUT_PATH=../remotion/renders # Render output directory
-LOG_LEVEL=INFO                       # Logging level
 
 # Future additions
 # OPENAI_API_KEY=sk-...

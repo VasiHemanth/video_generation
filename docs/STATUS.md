@@ -9,9 +9,8 @@
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| **### Phase 1: Foundation & LLM MVP
-**Status:** Completed (100%)
-**Goal:** Build a working end-to-end pipeline from natural language brief to rendered video using LLM-driven agents.
+| **Phase 1**: Foundation & LLM Fallback | ✅ Completed | ██████████ 100% |
+| **Phase 2**: Optimization & Audio | 🚧 In Progress | ▓▓░░░░░░░░ 20% |
 | **Phase 3**: Canvas & Deterministic Edits | 📋 Planned | ░░░░░░░░░░ 0% |
 | **Phase 4**: Intelligence & Ecosystem | 📋 Planned | ░░░░░░░░░░ 0% |
 
@@ -56,8 +55,8 @@
 
 ### 1.3 LangGraph Agent System
 | Agent | Status | Notes |
-|-------|--------|-------|
-| LLM service (Groq client) | 🚧 | Optional Groq client factory exists in `agents/video_gen_agents/llm.py`; nodes still use deterministic heuristics |
+|-------|--------|----------|
+| LLM service (Resilient Router) | ✅ | Cerebras (Primary) + Groq (Fallback) with 429 retry logic |
 | Manager Agent | ✅ | Brief → task plan + generation constraints |
 | Script & Storyboard Agent | ✅ | Deterministic beats + storyboard scenes |
 | Visual Design Agent | ✅ | Theme loading + per-scene layouts |
