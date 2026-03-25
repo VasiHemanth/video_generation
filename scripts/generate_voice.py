@@ -264,20 +264,6 @@ def main():
     segments = []
     total_start = time.time()
 
-    # ── 1. Intro (hook text) ───────────────────────────────────────────────────
-    intro_text = content.get("hook_text") or content.get("question_text", "")
-    if intro_text:
-        print("🎬 Generating intro voice...")
-        print(f"   Text: {intro_text[:80]}...")
-        prefix = os.path.join(out_dir, f"{q_id}_intro")
-        wav_path = generate_with_retry(model, intro_text, speaker_name, style_instruct, prefix, voice_speed)
-        duration = get_wav_duration(wav_path)
-        segments.append({
-            "id": "intro",
-            "path": os.path.abspath(wav_path),
-            "duration_seconds": round(duration, 2),
-        })
-        print(f"   ✅ {wav_path} ({duration:.1f}s)\n")
 
     # ── 2. Per-scene audio ─────────────────────────────────────────────────────
     # Support both new format (scenes[]) and legacy (answer_sections[])
@@ -288,7 +274,7 @@ def main():
         scenes = content.get("scenes", []) or content.get("answer_sections", [])
 
     for i, scene in enumerate(scenes):
-        scene_id = scene.get("id", f"scene_{i + 1:03d}")
+        scene_id = scene.get("scene_id") or scene.get("id") or f"scene_{i + 1:03d}"
         # Elements might have speech text
         spoken_text = scene.get("script", "")
         if not spoken_text:
@@ -326,19 +312,6 @@ def main():
         })
         print(f"   ✅ {wav_path} ({duration:.1f}s)\n")
 
-    # ── 3. Outro CTA ──────────────────────────────────────────────────────────
-    cta_text = content.get("cta_text", OUTRO_CTA_TEXT)
-    print(f"📢 Generating outro CTA: {cta_text[:60]}...")
-    prefix = os.path.join(out_dir, f"{q_id}_outro")
-    outro_speed = voice_speed * SCENE_SPEED_MODS.get("identity_cta", 0.95)
-    wav_path = generate_with_retry(model, cta_text, speaker_name, style_instruct, prefix, outro_speed)
-    duration = get_wav_duration(wav_path)
-    segments.append({
-        "id": "outro",
-        "path": os.path.abspath(wav_path),
-        "duration_seconds": round(duration, 2),
-    })
-    print(f"   ✅ {wav_path} ({duration:.1f}s)\n")
 
     # ── 4. Write manifest ──────────────────────────────────────────────────────
     manifest = {

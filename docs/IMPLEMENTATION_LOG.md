@@ -13,6 +13,16 @@ Use it alongside:
 3. Reference concrete files or directories when possible.
 4. Do not log planned work here unless it has already been committed or created locally.
 
+### 2026-03-23
+
+**Galileo Integration for Agentic Flow Tracing**
+
+Added:
+- `galileo` package to `agents/pyproject.toml`
+- `galileo_api_key` to `Settings` in `agents/video_gen_agents/config.py`
+- Galileo initialization and callback provider in `agents/video_gen_agents/llm.py`
+- `GalileoCallback` integration in `agents/video_gen_agents/pipeline.py`
+
 ### 2026-03-20
 
 **Live progress streaming and dashboard stage graph implemented**

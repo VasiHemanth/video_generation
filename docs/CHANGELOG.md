@@ -11,6 +11,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Phase 1 — Foundation & MVP
 
 #### Added
+- Galileo observability integration with `GalileoCallback` for agentic flow tracing and evaluation metrics
+- Render concurrency support in the Remotion service (using all available CPU cores)
+- Premium spring animation presets across `default`, `vibrant`, and `dark-tech` themes
 - Root workspace metadata: `package.json`, `pnpm-workspace.yaml`
 - Python package scaffold: `agents/pyproject.toml`
 - Environment template: `agents/.env.example`

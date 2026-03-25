@@ -32,7 +32,7 @@
     "easing_enter": "ease-out",
     "easing_exit": "ease-in",
     "easing_bounce": "cubic-bezier(0.68, -0.6, 0.32, 1.6)",
-    "easing_spring": { "mass": 1, "damping": 10, "stiffness": 170 },
+    "easing_spring": { "mass": 1, "damping": 15, "stiffness": 140 },
     "stagger_delay": 0.1
   },
   "layout": {

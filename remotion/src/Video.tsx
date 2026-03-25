@@ -60,11 +60,11 @@ export const VideoComposition = ({ir}: VideoCompositionProps) => {
 				);
 			})}
 
-			{/* 3. Voiceover Segments — Mapped to scenes by index */}
+			{/* 3. Voiceover Segments — Mapped to scenes by ID */}
 			{voiceover?.enabled &&
-				voiceover.segments.map((segment, idx) => {
-					// Map voice segments to scenes by index (more reliable than ID matching)
-					const scene = ir.timeline.scenes[idx];
+				voiceover.segments.map((segment) => {
+					// Safely map voice segments to visual scenes by their real IDs
+					const scene = ir.timeline.scenes.find((s) => s.id === segment.id);
 					const startTime = scene ? scene.start_time : 0;
 
 					return (

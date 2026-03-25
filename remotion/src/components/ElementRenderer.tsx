@@ -448,6 +448,9 @@ export const ElementRenderer = ({
 		transform: `${layoutStyle.transform ?? ""} translate(${merged.translateX + parallaxX}px, ${merged.translateY + parallaxY}px) rotate(${merged.rotate}deg) scale(${merged.scale})`,
 		transformOrigin: "center center",
 		overflow: element.type === "progress" ? "hidden" : undefined,
+		// Glassmorphism effect for elements with background
+		backdropFilter: element.props.glassmorphism || element.props.fill === "surface" ? "blur(12px) saturates(150%)" : undefined,
+		WebkitBackdropFilter: element.props.glassmorphism || element.props.fill === "surface" ? "blur(12px) saturate(150%)" : undefined,
 		clipPath:
 			merged.clipProgress < 1
 				? `inset(0 ${100 - merged.clipProgress * 100}% 0 0)`

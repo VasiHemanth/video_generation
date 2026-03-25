@@ -28,6 +28,7 @@ Brief → [LangGraph Agents] → Video IR → [Remotion] → [FFmpeg] → MP4
 | Video Rendering | Remotion (React/TS) |
 | Post-Processing | FFmpeg |
 | Dashboard | Vite + React |
+| Observability | Galileo (Evaluation & Tracing) |
 
 ## Project Structure
 

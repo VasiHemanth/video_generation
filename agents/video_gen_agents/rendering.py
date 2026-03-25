@@ -38,6 +38,9 @@ def render_project_ir(
         encoding="utf-8",
     )
 
+    import os
+    concurrency = os.cpu_count() or 4
+
     command = [
         "pnpm",
         "exec",
@@ -47,6 +50,7 @@ def render_project_ir(
         "VideoFromIR",
         str(raw_output_path),
         f"--props={props_path}",
+        f"--concurrency={concurrency}",
     ]
     result = subprocess.run(
         command,

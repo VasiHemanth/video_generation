@@ -22,7 +22,12 @@ class Settings:
     render_output_path: Path
     database_url: str | None = None
     groq_api_key: str | None = None
+    cerebras_api_key: str | None = None
+    galileo_api_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_public_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
+    cerebras_model: str = "gpt-oss-120b"
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "INFO"
@@ -64,7 +69,12 @@ class Settings:
             render_output_path=render_output,
             database_url=database_url,
             groq_api_key=os.getenv("GROQ_API_KEY"),
+            cerebras_api_key=os.getenv("CEREBRAS_API_KEY"),
+            galileo_api_key=os.getenv("GALILEO_API_KEY"),
+            langfuse_secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+            langfuse_public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
             groq_model=os.getenv("LLM_MODEL_NAME", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")),
+            cerebras_model=os.getenv("CEREBRAS_MODEL", "gpt-oss-120b"),
             host=os.getenv("HOST", "0.0.0.0"),
             port=int(os.getenv("PORT", "8000")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),

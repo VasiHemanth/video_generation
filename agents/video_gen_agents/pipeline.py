@@ -5,13 +5,21 @@ import json
 from pathlib import Path
 import re
 from langgraph.graph import END, START, StateGraph
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Dict, List, Optional, Union, cast, Literal
 from uuid import uuid4
 
+from langchain_core.runnables import RunnableConfig
 from .archetypes import build_from_archetype, detect_archetype, extract_topic
 from .config import Settings
 from .layouts import build_layouts_v2
-from .llm import build_groq_chat_model, groq_is_configured
+from .llm import (
+    groq_is_configured,
+    initialize_galileo,
+    start_galileo_session,
+    initialize_langfuse,
+    get_langfuse_callback,
+    build_resilient_model,
+)
 from .models import (
     AgentLogEntry,
     AnimationConfig,
@@ -178,6 +186,43 @@ def _duration_buckets(total_duration: float, scene_count: int) -> list[float]:
     durations[-1] = round(durations[-1] + difference, 1)
     return durations
 
+def _extract_json_with_retry(
+    model: Any, 
+    prompt: str, 
+    retries: int = 2, 
+    config: RunnableConfig | None = None
+) -> dict[str, Any]:
+    """Queries the LLM and robustly extracts JSON, retrying on failure."""
+    last_error = ""
+    for attempt in range(retries + 1):
+        try:
+            current_prompt = prompt
+            if attempt > 0:
+                current_prompt += f"\n\nCRITICAL FIX REQUIRED. Your previous output failed to parse as JSON with error: {last_error}\nYou MUST return ONLY valid JSON without conversational text."
+                
+            response = model.invoke(current_prompt, config=config)
+            content = response.content.strip()
+            
+            # 1. Try direct parsing after stripping markdown code blocks
+            clean_content = content.strip("`").removeprefix("json").strip()
+            try:
+                return json.loads(clean_content)
+            except json.JSONDecodeError:
+                pass
+                
+            # 2. Try regex extraction to find the first JSON object or array
+            match = re.search(r"(\{.*\}|\[.*\])", content, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+                
+            raise ValueError("No JSON object could be extracted from the response.")
+            
+        except Exception as e:
+            last_error = str(e)
+            print(f"LLM JSON extraction failed (attempt {attempt + 1}/{retries + 1}): {last_error}")
+            
+    raise ValueError(f"Failed to generate valid JSON after {retries + 1} attempts. Last error: {last_error}")
+
 
 def _run_voice_generation(
     settings: Settings,
@@ -188,30 +233,38 @@ def _run_voice_generation(
     """Invokes scripts/generate_voice.py to produce audio for the script."""
     import subprocess
     import tempfile
+    import sys
+    from pathlib import Path
 
     # Build intermediate JSON for the script (matches what generate_voice expects)
     content = {
         "timeline": {"scenes": [s.model_dump(mode="json") for s in storyboard]},
         "script_beats": [b.model_dump(mode="json") for b in script.beats],
     }
-    # Add script texts directly to scenes for audio generation
-    # Use voiceover_text (narration) rather than headline_text (on-screen)
+    
+    # Map beats to narration text (use voiceover_text primarily)
     beat_map = {b.id: (b.voiceover_text or b.text) for b in script.beats}
     for scene in content["timeline"]["scenes"]:
         scene["script"] = " ".join([beat_map.get(bid, "") for bid in scene.get("beat_ids", [])])
 
+    # Ensure output directory exists in Remotion public folder
     data_dir = settings.remotion_project_path / "public" / "voice"
     data_dir.mkdir(parents=True, exist_ok=True)
     
+    # Path to the voice generation script relative to project root
+    root_dir = settings.repo_root
+    voice_script = root_dir / "scripts" / "generate_voice.py"
+
     with tempfile.NamedTemporaryFile("w+", suffix=".json") as f:
         json.dump(content, f)
         f.flush()
         
         try:
+            # RUN subprocess from project root using the same python executable
             subprocess.run(
                 [
-                    "python3",
-                    "scripts/generate_voice.py",
+                    sys.executable,
+                    str(voice_script),
                     "--question", project_id,
                     "--content", f.name,
                     "--output-dir", str(data_dir),
@@ -219,6 +272,7 @@ def _run_voice_generation(
                 check=True,
                 capture_output=True,
                 text=True,
+                cwd=str(root_dir)
             )
             manifest_path = data_dir / f"{project_id}_voice_manifest.json"
             if manifest_path.exists():
@@ -847,6 +901,8 @@ def _merge_scene(
 class VideoGenerationService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or Settings.from_env()
+        initialize_galileo(self.settings)
+        initialize_langfuse(self.settings)
         self.graph = self._build_graph()
 
     def available_themes(self) -> list[str]:
@@ -869,8 +925,24 @@ class VideoGenerationService:
             initial_state["progress_callback"] = progress_callback
         if checkpoint_callback is not None:
             initial_state["checkpoint_callback"] = checkpoint_callback
-
-        state = self.graph.invoke(initial_state)
+        
+        galileo_cb = start_galileo_session(project_id, f"Video Generation - {project_id}")
+        langfuse_cb = get_langfuse_callback(project_id, f"Video Generation - {project_id}")
+        
+        callbacks = []
+        if galileo_cb:
+            callbacks.extend(galileo_cb)
+        if langfuse_cb:
+            callbacks.extend(langfuse_cb)
+            
+        config = {
+            "callbacks": callbacks,
+            "metadata": {
+                "langfuse_session_id": f"Video Generation - {project_id}",
+                "langfuse_tags": [project_id]
+            }
+        } if callbacks else {}
+        state = self.graph.invoke(initial_state, config=config)
         return GenerateVideoResponse(
             project_id=project_id,
             ir_path=state["ir_path"],
@@ -927,7 +999,7 @@ class VideoGenerationService:
 
         callback(state["project_id"], step_name, _json_safe(snapshot))
 
-    def _manager_node(self, state: VideoAgentState) -> dict:
+    def _manager_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         request = state["request"]
         _emit_progress(
             state,
@@ -938,7 +1010,7 @@ class VideoGenerationService:
             progress=0.04,
         )
 
-        model = build_groq_chat_model(self.settings, temperature=0.3)
+        model = build_resilient_model(self.settings, temperature=0.3)
         if model:
             try:
                 prompt = (
@@ -958,9 +1030,8 @@ class VideoGenerationService:
                     "Rule: Duration must be between 30.0 and 40.0. Scenes must be between 3 and 8.\n"
                     "Return ONLY JSON, no filler."
                 )
-                response = model.invoke(prompt)
-                print(f"DEBUG MANAGER RESPONSE: {response.content}")
-                parsed = json.loads(response.content.strip("`").removeprefix("json").strip())
+                parsed = _extract_json_with_retry(model, prompt, config=config)
+                print(f"DEBUG MANAGER RESPONSE: JSON extracted successfully")
                 constraints_dict = parsed.get("constraints", {})
                 constraints = GenerationConstraints(**constraints_dict)
             except Exception as e:
@@ -994,7 +1065,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "manager", ["plan", "constraints"])
         return res
 
-    def _script_node(self, state: VideoAgentState) -> dict:
+    def _script_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1005,7 +1076,7 @@ class VideoGenerationService:
         )
 
         constraints = state["constraints"]
-        model = build_groq_chat_model(self.settings, temperature=0.7)
+        model = build_resilient_model(self.settings, temperature=0.7)
         if model:
             try:
                 prompt = (
@@ -1026,8 +1097,14 @@ class VideoGenerationService:
                     '    "duration": float,\n'
                     '    "visual_note": string        // Internal instruction for Designer, NOT shown on screen\n'
                     "  }] },\n"
-                    '  "storyboard": [{ "scene_id": string, "role": string, "beat_ids": [string], '
-                    '"duration": float, "layout_hint": string, "description": string }]\n'
+                    '  "storyboard": [{ \n'
+                    '    "scene_id": string, \n'
+                    '    "role": "hook"|"problem"|"solution"|"feature"|"proof"|"cta", \n'
+                    '    "layout_hint": "centered_hero"|"split_layout"|"feature_showcase"|"stat_showcase"|"icon_grid"|"cta_card"|"quote"|"timeline_steps",\n'
+                    '    "beat_ids": [string], \n'
+                    '    "duration": float, \n'
+                    '    "description": string \n'
+                    '  }]\n'
                     "}\n\n"
                     "TEXT RULES (CRITICAL):\n"
                     "- headline_text: MAX 8 words. Punchy hook. Never start with 'First,' or 'Next,'\n"
@@ -1043,9 +1120,8 @@ class VideoGenerationService:
                     "- Each beat MUST be mapped to exactly one scene via beat_ids.\n"
                     "- Return ONLY the JSON object, no conversational filler."
                 )
-                response = model.invoke(prompt)
-                print(f"DEBUG SCRIPTWRITER RESPONSE: {response.content}")
-                parsed = json.loads(response.content.strip("`").removeprefix("json").strip())
+                parsed = _extract_json_with_retry(model, prompt, config=config)
+                print(f"DEBUG SCRIPTWRITER RESPONSE: JSON extracted successfully")
                 script = Script(**parsed["script"])
                 storyboard = [StoryboardScene(**s) for s in parsed["storyboard"]]
                 msg = f"Generated {len(script.beats)} beats and storyboard scenes using Groq LLM."
@@ -1097,7 +1173,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "scriptwriter", ["script", "storyboard"])
         return res
 
-    def _design_node(self, state: VideoAgentState) -> dict:
+    def _design_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1108,7 +1184,7 @@ class VideoGenerationService:
         )
 
         theme = load_theme(state["request"].theme_name, self.settings)
-        model = build_groq_chat_model(self.settings, temperature=0.7)
+        model = build_resilient_model(self.settings, temperature=0.7)
         if model:
             try:
                 # Design agent prompt - maps storyboard to layouts
@@ -1119,9 +1195,8 @@ class VideoGenerationService:
                     "Return ONLY JSON and NO other text: { \"layouts\": [{ \"scene_id\": string, \"background\": object, \"elements\": [{ \"id\": string, \"type\": string, \"props\": object, \"position\": object, \"anchor\": string, \"layer\": integer }] }] }\n"
                     "Rules: Unique layers 1, 2, 3... use theme colors like 'accent_1'."
                 )
-                response = model.invoke(prompt)
-                print(f"DEBUG DESIGNER RESPONSE: {response.content}")
-                parsed = json.loads(response.content.strip("`").removeprefix("json").strip())
+                parsed = _extract_json_with_retry(model, prompt, config=config)
+                print(f"DEBUG DESIGNER RESPONSE: JSON extracted successfully")
                 layouts = [SceneLayout(**l) for l in parsed["layouts"]]
                 msg = f"Created {len(layouts)} scene layouts using Groq LLM."
             except Exception as e:
@@ -1157,7 +1232,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "designer", ["theme", "layouts"])
         return res
 
-    def _motion_node(self, state: VideoAgentState) -> dict:
+    def _motion_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1168,22 +1243,29 @@ class VideoGenerationService:
         )
 
         theme = state["theme"]
-        model = build_groq_chat_model(self.settings, temperature=0.3)
+        model = build_resilient_model(self.settings, temperature=0.3)
         if model:
             try:
                 # Motion agent prompt - plans animations
                 prompt = (
                     "Add spring-based motion to these layouts.\n"
-                    f"Layouts: {json.dumps([l.model_dump() for l in state['layouts']], indent=2)}\n"
+                    f"Layouts: {json.dumps([l.model_dump() for l in state['layouts']], indent=2)}\n\n"
                     "Requirement: Return ONLY a JSON object with 'motion_plan' list.\n"
-                    "Structure: { 'motion_plan': [{ 'scene_id': string, 'elements': [{ 'element_id': string, 'enter': { 'type': 'fade'|'slide-up', 'duration': 0.3, 'delay': 0.1 }, 'exit': { 'type': 'fade', 'duration': 0.3 } }] }] }\n"
-                    "Rules: Unique element_ids only. No extra fields."
+                    "Structure: {\n"
+                    '  "motion_plan": [\n'
+                    '    {\n'
+                    '       "scene_id": string,\n'
+                    '       "transition_in": { "type": "fade"|"zoom"|"blur-in"|"slide-left"|"cross-dissolve", "duration": 0.4 },\n'
+                    '       "transition_out": { "type": "fade"|"blur-in", "duration": 0.3 },\n'
+                    '       "elements": [{ "element_id": string, "enter": { "type": "spring"|"slide-up", "duration": 0.5 } }]\n'
+                    '    }\n'
+                    '  ]\n'
+                    "}\n"
                 )
-                response = model.invoke(prompt)
-                print(f"DEBUG MOTION RESPONSE: {response.content}")
-                parsed = json.loads(response.content.strip("`").removeprefix("json").strip())
+                parsed = _extract_json_with_retry(model, prompt, config=config)
+                print(f"DEBUG MOTION RESPONSE: JSON extracted successfully")
                 motion_plan = [MotionScenePlan(**m) for m in parsed["motion_plan"]]
-                msg = f"Applied motion plans for {len(motion_plan)} scenes using Groq LLM."
+                msg = f"Applied motion plans for {len(motion_plan)} scenes (with transitions) using Groq LLM."
             except Exception as e:
                 print(f"Motion LLM Error: {str(e)}")
                 motion_plan = _build_motion(state["layouts"], theme)
@@ -1216,7 +1298,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "motion", ["motion_plan"])
         return res
 
-    def _audio_node(self, state: VideoAgentState) -> dict:
+    def _audio_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1252,7 +1334,7 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "audio", ["audio_plan"])
         return res
 
-    def _voice_node(self, state: VideoAgentState) -> dict:
+    def _voice_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1302,7 +1384,7 @@ class VideoGenerationService:
             "agent_logs": agent_logs,
         }
 
-    def _render_node(self, state: VideoAgentState) -> dict:
+    def _render_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         request = state["request"]
         _emit_progress(
             state,
@@ -1416,7 +1498,7 @@ class VideoGenerationService:
             "agent_logs": agent_logs,
         }
 
-    def _verify_node(self, state: VideoAgentState) -> dict:
+    def _verify_node(self, state: VideoAgentState, config: RunnableConfig) -> dict:
         _emit_progress(
             state,
             event="stage_started",
@@ -1449,7 +1531,7 @@ class VideoGenerationService:
             )
 
         # 2. Semantic checks via LLM
-        model = build_groq_chat_model(self.settings, temperature=0.1)
+        model = build_resilient_model(self.settings, temperature=0.1)
         if model:
             try:
                 prompt = (
@@ -1464,8 +1546,7 @@ class VideoGenerationService:
                     "}\n"
                     "Pass if the script covers the main points of the brief. Fail only if it is completely irrelevant."
                 )
-                response = model.invoke(prompt)
-                parsed = json.loads(response.content.strip("`").removeprefix("json").strip())
+                parsed = _extract_json_with_retry(model, prompt, config=config)
                 if parsed["status"] == "failed":
                     for issue in parsed["issues"]:
                         errors.append(VerificationIssue(**issue))

@@ -97,7 +97,8 @@
 | SQLite models (database.py) | ✅ | `agents/video_gen_agents/database.py` persists project records and agent logs |
 | REST API routes | 🚧 | `/health`, `/api/themes`, `/api/generate`, `POST /api/projects`, `/api/projects`, and `/api/projects/{id}` implemented; project detail includes stored IR and media artifacts are exposed via `/media/renders` and `/media/ir`; update/delete flows are still missing |
 | WebSocket endpoint | ✅ | Real-time per-project progress broadcasting via `ProgressBroker` and `/ws/projects/{project_id}` |
-| Remotion render service | ✅ | `agents/video_gen_agents/rendering.py` invokes the Remotion CLI with inline IR props |
+| Remotion render service | ✅ | `agents/video_gen_agents/rendering.py` invokes the Remotion CLI with inline IR props and concurrency support |
+| Galileo Integration | ✅ | Tracing and evaluation enabled via `GalileoCallback` in `llm.py` and `pipeline.py` |
 | FFmpeg service | ✅ | `agents/video_gen_agents/ffmpeg.py` post-processes Remotion output using system FFmpeg or `remotion ffmpeg` |
 | End-to-end smoke test | 🚧 | Manual API runs complete brief → IR → Remotion → FFmpeg → MP4 with persisted project records, and tests cover the async project launch + WebSocket path; an automated full-pipeline/browser smoke test is still missing |
 
