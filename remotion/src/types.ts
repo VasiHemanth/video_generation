@@ -102,6 +102,8 @@ export const elementTypeSchema = z.enum([
 	"divider",
 	"image",
 	"device",
+	"svg-path",
+	"svg-icon",
 ]);
 
 export const elementSchema = z.object({

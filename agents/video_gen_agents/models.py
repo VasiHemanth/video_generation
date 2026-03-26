@@ -21,6 +21,8 @@ ELEMENT_TYPES = {
     "divider",
     "image",
     "device",
+    "svg-path",
+    "svg-icon",
 }
 
 
@@ -169,6 +171,8 @@ class Element(StrictModel):
             "particle-field": {"count", "color"},
             "group": {"layout", "children"},
             "divider": {"orientation", "color"},
+            "svg-path": {"path_data", "stroke_color", "stroke_width"},
+            "svg-icon": {"icon_name", "color"},
         }
         required = required_props.get(self.type, set())
         missing = sorted(required.difference(self.props))

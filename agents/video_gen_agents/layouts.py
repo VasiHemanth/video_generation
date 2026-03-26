@@ -10,12 +10,14 @@ from __future__ import annotations
 from typing import Any
 
 from .models import (
+    AnimationConfig,
     BackgroundConfig,
     Element,
     Position,
     SceneLayout,
     ScriptBeat,
     Size,
+    SpringConfig,
     StoryboardScene,
     ThemeTokens,
 )
@@ -628,6 +630,315 @@ def layout_timeline_steps(
     )
 
 
+# ── New Scene Templates (Phase 3) ──────────────────────────────────────────
+
+
+def layout_card_stack(
+    scene_id: str,
+    beat: ScriptBeat,
+    index: int,
+    total: int,
+) -> SceneLayout:
+    """Vertical stack of 2-3 glassmorphism cards with stagger entry.
+
+    Matches reference Scene 4: Calendar → Tasks → Notes stacking below hero.
+    """
+    # Parse subtitle to get card items (split by . or , or use defaults)
+    import re
+    items = [s.strip() for s in re.split(r"[.,;]", beat.subtitle_text) if s.strip()]
+    if len(items) < 2:
+        items = ["Feature One", "Feature Two", "Feature Three"]
+    items = items[:3]  # Max 3 cards
+
+    elements: list[Element] = [
+        _particles(scene_id, index),
+        # Hero card at top
+        _glassmorphism_card(scene_id, x="50%", y="22%", w=800, h=160, layer=1),
+        _text_element(
+            element_id=f"{scene_id}_headline",
+            content=beat.headline_text or beat.text,
+            style_token="heading_lg",
+            color="fg_primary",
+            x="50%", y="22%", layer=2,
+        ),
+    ]
+
+    # Staggered info cards below
+    colors = ["accent_1", "accent_2", "accent_3"]
+    y_positions = ["44%", "60%", "76%"]
+    icons = ["document", "calendar", "checkmark"]
+
+    for i, item in enumerate(items):
+        card_y = y_positions[i] if i < len(y_positions) else f"{44 + i * 16}%"
+        # Icon element
+        elements.append(Element(
+            id=f"{scene_id}_icon_{i}",
+            type="svg-icon",
+            props={
+                "icon_name": icons[i % len(icons)],
+                "color": colors[i % len(colors)],
+                "size": 28,
+                "stagger_index": i,
+                "stagger_delay": 0.12,
+            },
+            position=Position(x="20%", y=card_y),
+            anchor="center",
+            layer=3 + i * 2,
+            enter=AnimationConfig(type="spring", duration=0.5),
+        ))
+        # Label text
+        elements.append(Element(
+            id=f"{scene_id}_card_label_{i}",
+            type="text",
+            props={
+                "content": item,
+                "style_token": "body_lg",
+                "color": "fg_primary",
+                "align": "left",
+                "max_width": 500,
+                "stagger_index": i,
+                "stagger_delay": 0.12,
+            },
+            position=Position(x="55%", y=card_y),
+            anchor="center",
+            layer=4 + i * 2,
+            enter=AnimationConfig(type="spring", duration=0.5),
+        ))
+
+    return SceneLayout(
+        scene_id=scene_id,
+        background=_pick_bg(index, total),
+        elements=elements,
+    )
+
+
+def layout_terminal_demo(
+    scene_id: str,
+    beat: ScriptBeat,
+    index: int,
+    total: int,
+) -> SceneLayout:
+    """Terminal/browser window with typed command text.
+
+    Matches reference Scene 2-3: Claude Code terminal with /today command.
+    """
+    return SceneLayout(
+        scene_id=scene_id,
+        background=_pick_bg(index, total),
+        elements=[
+            _particles(scene_id, index),
+            # Browser frame (device mockup)
+            Element(
+                id=f"{scene_id}_terminal",
+                type="device",
+                props={
+                    "variant": "browser",
+                    "color": "accent_1",
+                    "depth_3d": True,
+                },
+                position=Position(x="50%", y="45%"),
+                size=Size(width=780, height=480),
+                anchor="center",
+                layer=1,
+                enter=AnimationConfig(
+                    type="spring",
+                    duration=0.6,
+                    spring_config=SpringConfig(mass=1, damping=14, stiffness=180),
+                ),
+            ),
+            # Terminal title
+            _text_element(
+                element_id=f"{scene_id}_terminal_title",
+                content=beat.headline_text or beat.text,
+                style_token="code" if "code" in (beat.headline_text or "").lower() else "heading_md",
+                color="fg_primary",
+                x="50%", y="38%", layer=2,
+            ),
+            # Command text with word-by-word (typewriter effect)
+            Element(
+                id=f"{scene_id}_command",
+                type="text",
+                props={
+                    "content": beat.subtitle_text or "$ run command",
+                    "style_token": "code",
+                    "color": "accent_1",
+                    "align": "left",
+                    "max_width": 600,
+                    "word_animation": "word-by-word",
+                    "word_stagger": 0.06,
+                },
+                position=Position(x="50%", y="52%"),
+                anchor="center",
+                layer=3,
+                delay=0.4,
+                enter=AnimationConfig(type="fade", duration=0.3, delay=0.3),
+            ),
+            # Ambient floating accent
+            _accent_shape(
+                scene_id, shape="circle", fill="accent_2",
+                x="85%", y="20%", w=100, h=100, layer=4,
+                opacity=0.08, rotation=0,
+            ),
+        ],
+    )
+
+
+def layout_list_reveal(
+    scene_id: str,
+    beat: ScriptBeat,
+    index: int,
+    total: int,
+) -> SceneLayout:
+    """Container with rows populating one by one via stagger.
+
+    Matches reference Scene 6: Vault file list with stagger-in rows.
+    """
+    import re
+    items = [s.strip() for s in re.split(r"[.,;]", beat.subtitle_text) if s.strip()]
+    if len(items) < 3:
+        items = ["Item 1", "Item 2", "Item 3", "Item 4", "Item 5"]
+    items = items[:6]  # Max 6 rows
+
+    elements: list[Element] = [
+        _particles(scene_id, index),
+        # Title above the list
+        _text_element(
+            element_id=f"{scene_id}_headline",
+            content=beat.headline_text or beat.text,
+            style_token="heading_lg",
+            color="fg_primary",
+            x="50%", y="14%", layer=1,
+        ),
+        # Container card
+        _glassmorphism_card(scene_id, x="50%", y="55%", w=800, h=600, layer=2),
+    ]
+
+    # Staggered rows inside container
+    for i, item in enumerate(items):
+        row_y = f"{30 + i * 10}%"
+        # Row accent bar (left marker)
+        elements.append(Element(
+            id=f"{scene_id}_row_marker_{i}",
+            type="shape",
+            props={
+                "shape": "rounded-rect",
+                "fill": "accent_1" if i % 2 == 0 else "accent_2",
+                "stroke": "border",
+                "stroke_width": 0,
+                "corner_radius": 4,
+                "stagger_index": i,
+                "stagger_delay": 0.08,
+            },
+            position=Position(x="18%", y=row_y),
+            size=Size(width=6, height=28),
+            anchor="center",
+            layer=3 + i * 2,
+            enter=AnimationConfig(type="slide-up", duration=0.3),
+        ))
+        # Row text
+        elements.append(Element(
+            id=f"{scene_id}_row_text_{i}",
+            type="text",
+            props={
+                "content": item,
+                "style_token": "body_lg",
+                "color": "fg_primary",
+                "align": "left",
+                "max_width": 600,
+                "stagger_index": i,
+                "stagger_delay": 0.08,
+            },
+            position=Position(x="55%", y=row_y),
+            anchor="center",
+            layer=4 + i * 2,
+            enter=AnimationConfig(type="slide-up", duration=0.3),
+        ))
+
+    return SceneLayout(
+        scene_id=scene_id,
+        background=_pick_bg(index, total),
+        elements=elements,
+    )
+
+
+def layout_connection_graph(
+    scene_id: str,
+    beat: ScriptBeat,
+    index: int,
+    total: int,
+) -> SceneLayout:
+    """Two cards connected by an animated SVG path.
+
+    Matches reference Scene 7: Graph connections with dashed arc.
+    """
+    import re
+    parts = re.split(r"[.,;→]", beat.subtitle_text)
+    card_a = parts[0].strip() if parts else "Source"
+    card_b = parts[1].strip() if len(parts) > 1 else "Destination"
+
+    return SceneLayout(
+        scene_id=scene_id,
+        background=_pick_bg(index, total),
+        elements=[
+            _particles(scene_id, index),
+            # Card A (top-right)
+            _glassmorphism_card(scene_id, x="70%", y="25%", w=320, h=140, layer=1),
+            Element(
+                id=f"{scene_id}_card_a_icon",
+                type="svg-icon",
+                props={"icon_name": "document", "color": "accent_1", "size": 24},
+                position=Position(x="62%", y="25%"),
+                anchor="center",
+                layer=2,
+                enter=AnimationConfig(type="spring", duration=0.5),
+            ),
+            _text_element(
+                element_id=f"{scene_id}_card_a_label",
+                content=card_a,
+                style_token="heading_md",
+                color="fg_primary",
+                x="74%", y="25%", layer=3,
+            ),
+            # Connecting SVG path (draws itself after cards land)
+            Element(
+                id=f"{scene_id}_connector",
+                type="svg-path",
+                props={
+                    "path_data": "M 756 400 Q 540 700 324 1200",
+                    "stroke_color": "accent_1",
+                    "stroke_width": 3,
+                    "stroke_dash": "12 8",
+                    "draw_duration": 0.8,
+                    "draw_delay": 0.5,
+                },
+                position=Position(x="0%", y="0%"),
+                size=Size(width="100%", height="100%"),
+                layer=4,
+            ),
+            # Card B (bottom-left)
+            _glassmorphism_card(
+                scene_id + "_b", x="35%", y="72%", w=340, h=140, layer=5,
+            ),
+            Element(
+                id=f"{scene_id}_card_b_icon",
+                type="svg-icon",
+                props={"icon_name": "link", "color": "accent_2", "size": 24},
+                position=Position(x="27%", y="72%"),
+                anchor="center",
+                layer=6,
+                enter=AnimationConfig(type="spring", duration=0.5, delay=0.6),
+            ),
+            _text_element(
+                element_id=f"{scene_id}_card_b_label",
+                content=card_b,
+                style_token="heading_md",
+                color="fg_primary",
+                x="39%", y="72%", layer=7,
+            ),
+        ],
+    )
+
+
 # ── Layout dispatcher ──────────────────────────────────────────────────────────
 
 LAYOUT_MAP = {
@@ -639,6 +950,10 @@ LAYOUT_MAP = {
     "cta_card": layout_cta_card,
     "quote": layout_quote,
     "timeline_steps": layout_timeline_steps,
+    "card_stack": layout_card_stack,
+    "terminal_demo": layout_terminal_demo,
+    "list_reveal": layout_list_reveal,
+    "connection_graph": layout_connection_graph,
 }
 
 

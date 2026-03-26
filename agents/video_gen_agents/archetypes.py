@@ -175,8 +175,8 @@ COPY_TEMPLATES: dict[str, dict[str, dict[str, Any]]] = {
                 "Feature one: intelligent automation. {title} analyzes your {topic} patterns and automates the repetitive work.",
                 "The first thing you'll notice is the automation engine. It handles {topic} in the background while you focus on what matters.",
             ],
-            "layout_hint": "split_layout",
-            "visual_note": "Feature card with icon on left, description right. Device mockup showing the feature.",
+            "layout_hint": "card_stack",
+            "visual_note": "Card stack with svg-icon document icons. Spring stagger entry (0.12s between cards). Glassmorphism cards on dark surface. Ambient float on accent shapes.",
         },
         "feature_2": {
             "headlines": [
@@ -211,8 +211,8 @@ COPY_TEMPLATES: dict[str, dict[str, dict[str, Any]]] = {
                 "Feature three: it connects to everything. {title} integrates with the tools your team already uses.",
                 "And the best part? It fits right into your existing workflow. No migration, no disruption.",
             ],
-            "layout_hint": "icon_grid",
-            "visual_note": "Grid of integration icons or logo cards. Clean grid layout with connection lines.",
+            "layout_hint": "connection_graph",
+            "visual_note": "Two cards connected by animated svg-path arc (dashed teal). Cards spring in, then path draws itself. Svg-icons: link + gear.",
         },
         "cta": {
             "headlines": [
@@ -267,8 +267,8 @@ COPY_TEMPLATES: dict[str, dict[str, dict[str, Any]]] = {
                 "Step one: connect your tools. {title} integrates with your existing stack in under a minute.",
                 "Getting started is easy. Connect your data source and {title} handles the rest.",
             ],
-            "layout_hint": "split_layout",
-            "visual_note": "Step number '1' large on left, description and visual on right. Progress indicator.",
+            "layout_hint": "terminal_demo",
+            "visual_note": "Browser frame device mockup with typed command. Word-by-word typewriter on code text. Spring entry with depth_3d:true.",
         },
         "step_2": {
             "headlines": [
@@ -285,8 +285,8 @@ COPY_TEMPLATES: dict[str, dict[str, dict[str, Any]]] = {
                 "Step two: customize. Set your preferences, define your rules, and {title} adapts to your specific needs.",
                 "Next, configure it for your workflow. {title} is flexible enough to match how your team actually works.",
             ],
-            "layout_hint": "split_layout",
-            "visual_note": "Step '2' with configuration UI mockup. Settings panel or workflow builder visual.",
+            "layout_hint": "list_reveal",
+            "visual_note": "Container card with stagger-reveal rows (0.08s intervals). Left accent bars alternate accent_1/accent_2. Glassmorphism container.",
         },
         "step_3": {
             "headlines": [

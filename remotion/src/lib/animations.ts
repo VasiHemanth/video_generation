@@ -22,6 +22,15 @@ const resolveEasing = (value: string | null | undefined) => {
 		case "ease-in-out":
 			return Easing.inOut(Easing.quad);
 		case "ease-out":
+			return Easing.out(Easing.quad);
+		case "ease-out-back":
+			return Easing.out(Easing.back(1.5));
+		case "ease-out-expo":
+			return Easing.out(Easing.exp);
+		case "ease-in-out-expo":
+			return Easing.inOut(Easing.exp);
+		case "ease-out-cubic":
+			return Easing.out(Easing.cubic);
 		default:
 			return Easing.out(Easing.quad);
 	}

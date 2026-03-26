@@ -65,6 +65,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+### Phase 2 — Parallelization & Self-Correction ✅
+
+#### Added
+- Resilient LLM Router with Cerebras (primary) + Groq (fallback) and 429 retry logic
+- Provider-specific semaphores: 3 concurrent for Cerebras, 1 for Groq
+- Native async LangGraph pipeline using `asyncio.gather` for scene parallelization
+- Healer Agent for automatic JSON schema error correction
+- Langfuse integration for distributed tracing and session tracking
+- 5 narrative archetypes with copy templates in `archetypes.py`
+- 8 layout templates in `layouts.py` (centered_hero, split_layout, feature_showcase, stat_showcase, icon_grid, cta_card, quote, timeline_steps)
+- Per-scene Design and Motion agent calls with LLM healing loop
+
+#### Changed
+- `pipeline.py` refactored to process Designer and Motion nodes concurrently
+- `llm.py` extended with `build_resilient_model()` and semaphore management
+
+---
+
+### Phase 3 — Motion Intelligence, SVG Components & Scene Templates 🚧
+
+> Plan: [PLAN_V3.md](./PLAN_V3.md)
+
+#### Added (Planned)
+- WS1: Extended easing library (ease-out-back, expo, cubic) in `animations.ts`
+- WS1: Ambient float motion in `ElementRenderer.tsx`
+- WS1: Stagger group auto-delay for cascading element entries
+- WS2: 4 new scene templates (card_stack, terminal_demo, list_reveal, connection_graph) in `layouts.py`
+- WS3: `svg-path` element type with stroke draw-on via `@remotion/paths` `evolvePath()`
+- WS3: `svg-icon` element type with 12 built-in icons in `SvgRenderer.tsx`
+- WS4: Enriched Designer and Motion agent prompts with full animation vocabulary
+- WS5: `warm-clay.json` theme matching reference video aesthetic
+
+#### Analysis & Research (Completed)
+- Frame-by-frame reference video breakdown of @GregIsenberg's YouTube Short
+- Identified 6 animation primitives and 7 scene patterns used in professional educational shorts
+- Motion design audit comparing current engine capabilities vs reference quality
+- Confirmed `@remotion/paths` `evolvePath()` for SVG draw-on animation
+
 ## Changelog Convention
 
 ### Categories

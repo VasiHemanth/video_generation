@@ -33,34 +33,41 @@
 
 ---
 
-## Phase 2 — Audio, Advanced Visuals & Polish 📋
+## Phase 2 — Parallelization & Self-Correction ✅
 
-**Goal**: Full audio pipeline, richer visuals, production polish
+**Goal**: High-performance, resilient, and parallel processing.
 
-### Features
+### Completed Milestones
+- [x] **Provider-Specific Semaphores**: 3 concurrent for Cerebras, 1 for Groq.
+- [x] **LangGraph Async Overhaul**: Entire pipeline is now native async.
+- [x] **Scene Parallelization**: Designer and Motion nodes process scenes concurrently.
+- [x] **Healer Agent**: Automatically corrects LLM JSON schema errors on-the-fly.
 
-| Feature | Priority | Description |
-|---------|----------|-------------|
-| Audio & SFX Agent | P0 | Full audio planning: music selection, SFX placement, level management |
-| TTS Integration | P0 | Voiceover via local Qwen or Google Cloud TTS |
-| Bundled SFX Library | P0 | Whoosh, click, impact, rise, drop, notification, ambient |
-| Music Library | P1 | Curated royalty-free music tracks bundled in project |
-| Audio Muxing | P0 | FFmpeg audio track composition, ducking, normalization |
-| Checkpoint System | P1 | IR snapshots with rollback capability |
-| Tier 2 Visuals | P1 | SVG illustrations, icon compositions, diagram scenes |
-| Advanced Motion | P1 | Parallax, camera simulation, depth layers |
-| Scene Templates | P2 | Pre-designed scene archetypes (comparison, list, timeline) |
-| Scene Parallelization | P0 | Parallel execution of independent agent nodes |
-| Error Recovery v2 | P1 | Self-healing loops for schema validation errors |
-| Audio & SFX Agent | P0 | Full audio planning: music selection, SFX placement |
+---
+
+## Phase 3 — Motion Intelligence, SVG Components & Scene Templates 🚧
+
+**Goal**: Professional motion design quality through animation upgrades, dynamic SVG system, and prompt enrichment.
+
+**Plan**: See [PLAN_V3.md](./PLAN_V3.md) for detailed technical plan.
+
+### Workstreams
+| WS | Feature | Priority | Description |
+|----|---------|----------|-------------|
+| WS1 | Animation Engine Upgrades | P0 | Ambient float, 4 new easing curves, stagger groups, 3D depth |
+| WS2 | Scene Templates | P0 | card-stack, terminal-demo, list-reveal, connection-graph layouts |
+| WS3 | Dynamic SVG Components | P0 | `svg-path` draw-on via `@remotion/paths`, `svg-icon` with 12 built-in icons |
+| WS4 | Prompt Enrichment | P0 | Rewrite Designer + Motion agent prompts with full animation vocabulary |
+| WS5 | Theme Upgrade | P1 | Warm claymorphic theme matching reference video aesthetic |
 
 ### Tier 2 Visual Capabilities
-- SVG icon compositions and illustrations
-- Diagram and flowchart animations
-- Device mockup frames (phone, laptop, browser)
-- Before/after comparison layouts
-- Timeline / journey visualizations
-- Data dashboard layouts
+- SVG path draw-on animations (connecting lines, flow arcs)
+- Built-in SVG icon library (12 icons: checkmark, document, calendar, code, etc.)
+- Spring-physics card stacking with stagger cascades
+- Terminal/browser frame mockups with typewriter text
+- Ambient float motion on decorative elements
+- Glassmorphism card surfaces with 3D perspective depth
+- Extended easing curves (ease-out-back, expo, cubic)
 
 ---
 

@@ -9,6 +9,7 @@ import {
 
 import {getAnimationStyle, keyframedValue, mergeAnimationStyles} from "../lib/animations";
 import {positionStyle, resolvePixelValue} from "../lib/geometry";
+import {renderSvgIcon, renderSvgPath} from "./SvgRenderer";
 import type {Element, Theme} from "../types";
 
 const resolveColor = (value: unknown, theme: Theme): string => {
@@ -393,8 +394,15 @@ export const ElementRenderer = ({
 	const frame = useCurrentFrame();
 	const {fps, durationInFrames, width, height} = useVideoConfig();
 
+	// ── Stagger group: auto-offset entry delay based on stagger_index ──
+	const staggerIndex = typeof element.props.stagger_index === "number" ? element.props.stagger_index : null;
+	const staggerDelay = typeof element.props.stagger_delay === "number" ? element.props.stagger_delay : 0.1;
+	const effectiveEnter = staggerIndex != null && element.enter
+		? { ...element.enter, delay: (element.enter.delay ?? 0) + staggerIndex * staggerDelay }
+		: element.enter;
+
 	const enter = getAnimationStyle({
-		animation: element.enter,
+		animation: effectiveEnter,
 		frame,
 		fps,
 		phase: "enter",
@@ -441,15 +449,38 @@ export const ElementRenderer = ({
 	const parallaxX = element.parallax_factor ? (frame - durationInFrames / 2) * element.parallax_factor : 0;
 	const parallaxY = element.parallax_factor ? (frame - durationInFrames / 2) * (element.parallax_factor * 0.6) : 0;
 
+	// ── Ambient float: continuous organic sine-wave drift ──
+	const ambient = element.props.ambient as
+		| { type?: string; amplitude?: number; frequency?: number; phase?: number }
+		| undefined;
+	const hasAmbient = ambient?.type === "float";
+	const ambientAmplitude = ambient?.amplitude ?? 4;
+	const ambientFrequency = ambient?.frequency ?? 0.3;
+	const ambientPhase = ambient?.phase ?? 0;
+	const ambientY = hasAmbient
+		? Math.sin(frame * ambientFrequency * 0.1 + ambientPhase) * ambientAmplitude
+		: 0;
+	const ambientX = hasAmbient
+		? Math.cos(frame * ambientFrequency * 0.07 + ambientPhase) * ambientAmplitude * 0.5
+		: 0;
+
+	// ── 3D depth: perspective + subtle rotation ──
+	const has3D = element.props.depth_3d === true;
+
+	const totalTranslateX = merged.translateX + parallaxX + ambientX;
+	const totalTranslateY = merged.translateY + parallaxY + ambientY;
+	const rotateY3D = has3D ? " rotateY(2deg)" : "";
+
 	const sharedStyle: CSSProperties = {
 		position: "absolute",
 		...layoutStyle,
 		opacity: merged.opacity,
-		transform: `${layoutStyle.transform ?? ""} translate(${merged.translateX + parallaxX}px, ${merged.translateY + parallaxY}px) rotate(${merged.rotate}deg) scale(${merged.scale})`,
+		perspective: has3D ? "1000px" : undefined,
+		transform: `${layoutStyle.transform ?? ""} translate(${totalTranslateX}px, ${totalTranslateY}px) rotate(${merged.rotate}deg) scale(${merged.scale})${rotateY3D}`,
 		transformOrigin: "center center",
 		overflow: element.type === "progress" ? "hidden" : undefined,
 		// Glassmorphism effect for elements with background
-		backdropFilter: element.props.glassmorphism || element.props.fill === "surface" ? "blur(12px) saturates(150%)" : undefined,
+		backdropFilter: element.props.glassmorphism || element.props.fill === "surface" ? "blur(12px) saturate(150%)" : undefined,
 		WebkitBackdropFilter: element.props.glassmorphism || element.props.fill === "surface" ? "blur(12px) saturate(150%)" : undefined,
 		clipPath:
 			merged.clipProgress < 1
@@ -506,6 +537,14 @@ export const ElementRenderer = ({
 				}}
 			/>
 		);
+	}
+
+	if (element.type === "svg-path") {
+		return <div style={sharedStyle}>{renderSvgPath({element, theme, frame, fps})}</div>;
+	}
+
+	if (element.type === "svg-icon") {
+		return <div style={sharedStyle}>{renderSvgIcon({element, theme})}</div>;
 	}
 
 	return <div style={sharedStyle}>{renderUnsupported(element, theme)}</div>;

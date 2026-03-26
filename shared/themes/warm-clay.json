@@ -1,0 +1,46 @@
+{
+  "name": "warm-clay",
+  "colors": {
+    "bg_primary": "#E8E0D4",
+    "bg_secondary": "#D4CBC0",
+    "fg_primary": "#1A1A2E",
+    "fg_secondary": "#4A4A5A",
+    "accent_1": "#5BA8A0",
+    "accent_2": "#7B6BA4",
+    "accent_3": "#E8913A",
+    "gradient_start": "#E8E0D4",
+    "gradient_end": "#D4CBC0",
+    "surface": "#2D2D3A",
+    "border": "#3D3D4A"
+  },
+  "typography": {
+    "display_lg": { "family": "Inter", "weight": 800, "size": 72, "lineHeight": 1.1 },
+    "display_md": { "family": "Inter", "weight": 700, "size": 56, "lineHeight": 1.15 },
+    "display_sm": { "family": "Inter", "weight": 700, "size": 40, "lineHeight": 1.2 },
+    "heading_lg": { "family": "Inter", "weight": 600, "size": 32, "lineHeight": 1.3 },
+    "heading_md": { "family": "Inter", "weight": 600, "size": 24, "lineHeight": 1.35 },
+    "body_lg":    { "family": "Inter", "weight": 400, "size": 20, "lineHeight": 1.5 },
+    "body_md":    { "family": "Inter", "weight": 400, "size": 16, "lineHeight": 1.5 },
+    "caption":    { "family": "Inter", "weight": 400, "size": 14, "lineHeight": 1.4 },
+    "code":       { "family": "JetBrains Mono", "weight": 400, "size": 16, "lineHeight": 1.5 }
+  },
+  "motion": {
+    "duration_fast": 0.15,
+    "duration_normal": 0.4,
+    "duration_slow": 0.7,
+    "duration_very_slow": 1.0,
+    "easing_default": "ease-out-cubic",
+    "easing_enter": "ease-out-back",
+    "easing_exit": "ease-in",
+    "easing_bounce": "ease-out-back",
+    "easing_spring": { "mass": 1, "damping": 14, "stiffness": 180 },
+    "stagger_delay": 0.1
+  },
+  "layout": {
+    "padding": 60,
+    "gap": 24,
+    "card_radius": 20,
+    "safe_area_x": 120,
+    "safe_area_y": 80
+  }
+}

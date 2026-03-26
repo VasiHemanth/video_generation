@@ -1198,20 +1198,43 @@ class VideoGenerationService:
         """Process a single scene layout with LLM design logic."""
         model = build_resilient_model(self.settings, temperature=0.7)
         prompt = (
-            "You are a Motion Graphics Designer. Create a professional layout for this specific video scene.\n\n"
-            f"Scene Description: {scene.description}\n"
+            "You are a Premium Motion Graphics Designer creating high-end educational video scenes.\n\n"
+            f"Scene: {scene.description}\n"
             f"Role: {scene.role}\n"
             f"Duration: {scene.duration}s\n"
-            f"Theme Context: {theme.name} ({json.dumps(theme.colors.model_dump())})\n\n"
-            "Return ONLY a JSON object matching this schema:\n"
-            "{\n"
-            '  "scene_id": "' + scene.scene_id + '",\n'
-            '  "background": { "type": "gradient"|"animated-gradient"|"solid", "colors": ["bg_primary", "surface"], "angle": 120 },\n'
-            '  "elements": [\n'
-            '    { "id": "headline", "type": "text", "props": { "content": "...", "style_token": "display_md", "color": "fg_primary", "align": "center" }, "position": { "x": "50%", "y": "40%" }, "layer": 1 }\n'
-            '  ]\n'
-            "}\n"
-            "Rules: Use theme token names like 'accent_1', 'bg_primary'. Layers must be unique (1, 2, 3...)."
+            f"Theme: {json.dumps(theme.colors.model_dump())}\n\n"
+            "AVAILABLE ELEMENT TYPES:\n"
+            "- text: props={content, style_token, color, align, max_width, word_animation, word_stagger}\n"
+            "- shape: props={shape:'circle'|'rounded-rect'|'triangle', fill, stroke, corner_radius, glassmorphism:true}\n"
+            "- device: props={variant:'browser'|'phone', color, depth_3d:true}\n"
+            "- counter: props={from, to, prefix, suffix, style_token, color, format}\n"
+            "- progress: props={variant, value, max, color, track_color, thickness, label}\n"
+            "- particle-field: props={count, color, size_range:[2,5], speed, opacity}\n"
+            "- divider: props={orientation, thickness, color}\n"
+            "- svg-path: props={path_data:'M x y Q cx cy ex ey', stroke_color, stroke_width, stroke_dash:'12 8', draw_duration:0.8, draw_delay:0}\n"
+            "- svg-icon: props={icon_name, color, size:32} — icons: checkmark, arrow_right, arrow_down, document, calendar, folder, link, code, star, gear, lightning, chart_bar\n\n"
+            "ANIMATION PROPS (add to any element's props):\n"
+            "- word_animation:'word-by-word' + word_stagger:0.04 — for text reveals\n"
+            "- glassmorphism:true — frosted glass effect on shapes\n"
+            "- ambient:{type:'float', amplitude:4, frequency:0.3, phase:0} — organic drift\n"
+            "- stagger_index:0,1,2 + stagger_delay:0.12 — cascading entry within groups\n"
+            "- depth_3d:true — perspective depth effect on device/cards\n"
+            "- parallax_factor:0.1 — scroll-parallax depth on background elements\n\n"
+            "LAYOUT PATTERNS:\n"
+            "- centered_hero: Single headline + subtitle, accent shapes\n"
+            "- card_stack: 2-3 cards stacking vertically with stagger + svg-icons\n"
+            "- terminal_demo: Browser frame with typed commands\n"
+            "- list_reveal: Rows appearing one by one via stagger\n"
+            "- connection_graph: Two cards connected by svg-path arc\n"
+            "- split_layout: Headline left, device mockup right\n\n"
+            "RULES:\n"
+            "- Use word_animation:'word-by-word' on ALL text elements\n"
+            "- Add ambient:{type:'float', amplitude:3, frequency:0.2} on decorative shapes\n"
+            "- Add parallax_factor:0.1 to background shapes\n"
+            "- Maximum 5-6 elements per scene for visual clarity\n"
+            "- Use theme token names: 'accent_1', 'bg_primary', 'fg_primary', 'surface', etc.\n"
+            "- Layers must be unique (1, 2, 3...)\n\n"
+            'Return ONLY a JSON object: {"scene_id": "' + scene.scene_id + '", "background": {...}, "elements": [...]}'
         )
         
         try:
@@ -1237,15 +1260,35 @@ class VideoGenerationService:
         """Process a single scene motion plan with LLM logic."""
         model = build_resilient_model(self.settings, temperature=0.3)
         prompt = (
-            "You are a Motion Effects Artist. Add spring animations and transitions to this scene layout.\n\n"
+            "You are a Motion Effects Artist. Add sophisticated physics-based animations to this scene.\n\n"
             f"Layout: {json.dumps(layout.model_dump(), indent=2)}\n\n"
-            "Return ONLY a JSON object matching this schema:\n"
-            "{\n"
-            '  "scene_id": "' + layout.scene_id + '",\n'
-            '  "transition_in": { "type": "fade"|"zoom"|"slide-left", "duration": 0.4 },\n'
-            '  "transition_out": { "type": "fade", "duration": 0.3 },\n'
-            '  "elements": [{ "element_id": "headline", "enter": { "type": "spring"|"slide-up", "duration": 0.5 } }]\n'
-            "}\n"
+            "ANIMATION TYPES (for enter/exit/emphasis):\n"
+            "- spring: Natural physics-based pop (PREFERRED for cards, shapes, icons)\n"
+            "- bounce: Playful overshoot entry\n"
+            "- slide-up: Slide from below with easing\n"
+            "- slide-left: Slide from right\n"
+            "- slide-down: Slide from above\n"
+            "- slide-right: Slide from left\n"
+            "- fade: Simple opacity transition (use sparingly)\n"
+            "- scale-in: Scale from small to full\n"
+            "- wipe: Horizontal clip reveal\n\n"
+            "EASING: ease-out, ease-in, ease-in-out, ease-out-back, ease-out-expo, ease-in-out-expo, ease-out-cubic\n\n"
+            "SPRING CONFIGS (mass, damping, stiffness):\n"
+            "- Cards/shapes: {mass:1, damping:14, stiffness:180}\n"
+            "- Text: {mass:0.8, damping:18, stiffness:200}\n"
+            "- Icons: {mass:0.5, damping:12, stiffness:220}\n\n"
+            "RULES:\n"
+            "- Use spring or bounce for ALL card/shape entries, NOT fade\n"
+            "- Use slide-up with ease-out-back easing for text entries\n"
+            "- Stagger elements: delay each 0.08-0.15s after previous\n"
+            "- Scene transitions: use zoom or wipe, NOT just fade\n"
+            "- Exit animations: use scale-in (shrink) or slide-left\n"
+            "- svg-path elements: DO NOT add enter/exit (they self-animate)\n"
+            "- svg-icon elements: use spring entry with delay matched to their card\n\n"
+            'Return ONLY a JSON object: {"scene_id": "' + layout.scene_id + '", '
+            '"transition_in": {"type":"...", "duration":0.4}, '
+            '"transition_out": {"type":"...", "duration":0.3}, '
+            '"elements": [{"element_id":"...", "enter":{"type":"...", "duration":0.5}, "exit":{"type":"...", "duration":0.3}}]}'
         )
         
         try:
