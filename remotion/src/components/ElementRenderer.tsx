@@ -67,10 +67,10 @@ const renderText = ({
 	const token = theme.typography[tokenName] ?? theme.typography.body_md;
 	const text = typeof element.props.content === "string" ? element.props.content : "";
 	const align = typeof element.props.align === "string" ? element.props.align : "left";
-	const wordAnimation =
-		typeof element.props.word_animation === "string" ? element.props.word_animation : "none";
-	const wordStagger =
-		typeof element.props.word_stagger === "number" ? element.props.word_stagger : 0.04;
+	const wordAnimation = (element.word_animation || element.props.word_animation) as string | undefined;
+	const wordStagger = typeof element.word_stagger === "number"
+		? element.word_stagger
+		: (typeof element.props.word_stagger === "number" ? element.props.word_stagger : 0.05);
 	const maxWidth =
 		typeof element.props.max_width === "number" ? element.props.max_width : undefined;
 
@@ -395,8 +395,14 @@ export const ElementRenderer = ({
 	const {fps, durationInFrames, width, height} = useVideoConfig();
 
 	// ── Stagger group: auto-offset entry delay based on stagger_index ──
-	const staggerIndex = typeof element.props.stagger_index === "number" ? element.props.stagger_index : null;
-	const staggerDelay = typeof element.props.stagger_delay === "number" ? element.props.stagger_delay : 0.1;
+	const staggerIndex = typeof element.stagger_index === "number" 
+		? element.stagger_index 
+		: (typeof element.props.stagger_index === "number" ? element.props.stagger_index : null);
+	
+	const staggerDelay = typeof element.stagger_delay === "number"
+		? element.stagger_delay
+		: (typeof element.props.stagger_delay === "number" ? element.props.stagger_delay : 0.1);
+
 	const effectiveEnter = staggerIndex != null && element.enter
 		? { ...element.enter, delay: (element.enter.delay ?? 0) + staggerIndex * staggerDelay }
 		: element.enter;
@@ -450,8 +456,8 @@ export const ElementRenderer = ({
 	const parallaxY = element.parallax_factor ? (frame - durationInFrames / 2) * (element.parallax_factor * 0.6) : 0;
 
 	// ── Ambient float: continuous organic sine-wave drift ──
-	const ambient = element.props.ambient as
-		| { type?: string; amplitude?: number; frequency?: number; phase?: number }
+	const ambient = (element.ambient || element.props.ambient) as
+		| {type: "float"; amplitude?: number; frequency?: number; phase?: number}
 		| undefined;
 	const hasAmbient = ambient?.type === "float";
 	const ambientAmplitude = ambient?.amplitude ?? 4;

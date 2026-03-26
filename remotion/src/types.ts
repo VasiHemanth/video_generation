@@ -123,6 +123,11 @@ export const elementSchema = z.object({
 	keyframes: z.array(keyframeSchema).default([]),
 	delay: z.number().nullable().optional(),
 	parallax_factor: z.number().nullable().optional(),
+	ambient: z.record(z.string(), z.unknown()).nullable().optional(),
+	stagger_index: z.number().nullable().optional(),
+	stagger_delay: z.number().nullable().optional(),
+	word_animation: z.string().nullable().optional(),
+	word_stagger: z.number().nullable().optional(),
 });
 
 export const sceneSchema = z.object({

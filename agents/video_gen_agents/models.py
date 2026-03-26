@@ -151,7 +151,12 @@ class Element(StrictModel):
     emphasis: AnimationConfig | None = None
     keyframes: list[Keyframe] = Field(default_factory=list)
     delay: float | None = None
-    parallax_factor: float | None = Field(default=None, alias="parallax_factor")
+    parallax_factor: float | None = Field(default=None)
+    ambient: dict[str, Any] | None = None
+    stagger_index: int | None = None
+    stagger_delay: float | None = None
+    word_animation: str | None = None
+    word_stagger: float | None = None
 
     @field_validator("type")
     @classmethod
@@ -306,14 +311,15 @@ class ProjectIR(StrictModel):
                 raise ValueError(f"Scene {scene.id} has a non-sequential start_time")
             expected_start = round(expected_start + scene.duration, 3)
 
-            seen_layers: set[int] = set()
             for color in scene.background.colors:
                 self._validate_color_ref(color, theme_colors)
 
+            # Check for element ID uniqueness
+            ids = set()
             for element in scene.elements:
-                if element.layer in seen_layers:
-                    raise ValueError(f"Duplicate layer {element.layer} in scene {scene.id}")
-                seen_layers.add(element.layer)
+                if element.id in ids:
+                    raise ValueError(f"Duplicate element ID {element.id} in scene {scene.id}")
+                ids.add(element.id)
                 self._validate_element_refs(element, theme_colors, typography_tokens)
 
         return self
@@ -419,10 +425,22 @@ class SceneLayout(StrictModel):
 
 class ElementMotion(StrictModel):
     element_id: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_id_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "id" in data and "element_id" not in data:
+                # Copy instead of pop to avoid mutating if shared (though unlikely here)
+                data = data.copy()
+                data["element_id"] = data.pop("id")
+        return data
+
     enter: AnimationConfig | None = None
     exit: AnimationConfig | None = None
     emphasis: AnimationConfig | None = None
     keyframes: list[Keyframe] = Field(default_factory=list)
+    delay: float | None = None
 
 
 class MotionScenePlan(StrictModel):

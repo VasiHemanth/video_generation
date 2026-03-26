@@ -1205,6 +1205,7 @@ class VideoGenerationService:
             f"Theme: {json.dumps(theme.colors.model_dump())}\n\n"
             "AVAILABLE ELEMENT TYPES:\n"
             "- text: props={content, style_token, color, align, max_width, word_animation, word_stagger}\n"
+            "  TYPOGRAPHY TOKENS: display_lg, display_md, display_sm, heading_lg, heading_md, body_lg, body_md, caption, code\n"
             "- shape: props={shape:'circle'|'rounded-rect'|'triangle', fill, stroke, corner_radius, glassmorphism:true}\n"
             "- device: props={variant:'browser'|'phone', color, depth_3d:true}\n"
             "- counter: props={from, to, prefix, suffix, style_token, color, format}\n"
@@ -1227,14 +1228,32 @@ class VideoGenerationService:
             "- list_reveal: Rows appearing one by one via stagger\n"
             "- connection_graph: Two cards connected by svg-path arc\n"
             "- split_layout: Headline left, device mockup right\n\n"
+            "JSON STRUCTURE (STRICTLY FOLLOW THIS):\n"
+            "{\n"
+            '  "scene_id": "' + scene.scene_id + '",\n'
+            '  "background": { "type": "gradient"|"animated-gradient"|"solid", "colors": ["bg_primary", "surface"], "angle": 120 },\n'
+            '  "elements": [\n'
+            '    {\n'
+            '      "id": "element_name",\n'
+            '      "type": "text|shape|device|svg-path|svg-icon|...",\n'
+            '      "props": { ... },\n'
+            '      "position": { "x": "50%", "y": "40%" },\n'
+            '      "layer": 1\n'
+            '    }\n'
+            '  ]\n'
+            "}\n\n"
             "RULES:\n"
             "- Use word_animation:'word-by-word' on ALL text elements\n"
-            "- Add ambient:{type:'float', amplitude:3, frequency:0.2} on decorative shapes\n"
-            "- Add parallax_factor:0.1 to background shapes\n"
+            "- Add ambient:{type:'float', amplitude:4, frequency:0.3} to decorative elements (at top-level)\n"
+            "- Add parallax_factor:0.1 to background elements (layer 1-2, at top-level)\n"
+            "- Add stagger_index:0,1,2 and stagger_delay:0.12 to elements within a sequence (at top-level)\n"
+            "- background.colors MUST be a list of 1-3 theme token names (e.g. ['bg_primary', 'surface'])\n"
+            "- NEVER add extra fields like 'direction' or 'parallax_factor' to the background object\n"
             "- Maximum 5-6 elements per scene for visual clarity\n"
             "- Use theme token names: 'accent_1', 'bg_primary', 'fg_primary', 'surface', etc.\n"
             "- Layers must be unique (1, 2, 3...)\n\n"
-            'Return ONLY a JSON object: {"scene_id": "' + scene.scene_id + '", "background": {...}, "elements": [...]}'
+            'Return ONLY a JSON object: {"scene_id": "' + scene.scene_id + '", "background": {"type":"...", "colors":["..."], "angle":120}, "elements": [...]}\n'
+            "Element structure: {\"id\":\"...\", \"type\":\"...\", \"props\":{...}, \"position\":{\"x\":\"...\", \"y\":\"...\"}, \"layer\":1, \"parallax_factor\":0.1, \"ambient\":{...}, \"stagger_index\":0}"
         )
         
         try:
@@ -1284,11 +1303,21 @@ class VideoGenerationService:
             "- Scene transitions: use zoom or wipe, NOT just fade\n"
             "- Exit animations: use scale-in (shrink) or slide-left\n"
             "- svg-path elements: DO NOT add enter/exit (they self-animate)\n"
-            "- svg-icon elements: use spring entry with delay matched to their card\n\n"
-            'Return ONLY a JSON object: {"scene_id": "' + layout.scene_id + '", '
-            '"transition_in": {"type":"...", "duration":0.4}, '
-            '"transition_out": {"type":"...", "duration":0.3}, '
-            '"elements": [{"element_id":"...", "enter":{"type":"...", "duration":0.5}, "exit":{"type":"...", "duration":0.3}}]}'
+            "- svg-icon elements: use spring entry with delay matched to their card\n"
+            "- NEVER add a top-level 'background' field to the JSON (it is already handled in Layout)\n\n"
+            "JSON STRUCTURE (STRICTLY FOLLOW THIS):\n"
+            "{\n"
+            '  "scene_id": "' + layout.scene_id + '",\n'
+            '  "transition_in": { "type": "zoom"|"wipe"|"fade"|"slide-left", "duration": 0.4, "easing": "ease-out-expo" },\n'
+            '  "transition_out": { "type": "fade"|"scale-in", "duration": 0.3 },\n'
+            '  "elements": [\n'
+            '    {\n'
+            '      "element_id": "id_from_layout",\n'
+            '      "enter": { "type": "spring", "duration": 0.5, "spring_config": {"mass":1, "damping":14, "stiffness":180}, "delay": 0.1 },\n'
+            '      "exit": { "type": "fade", "duration": 0.3 }\n'
+            '    }\n'
+            '  ]\n'
+            "}\n"
         )
         
         try:
