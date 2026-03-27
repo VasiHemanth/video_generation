@@ -41,8 +41,8 @@ export const resolvePixelValue = (
 
 export const anchorTransform = (anchor: string | null | undefined): string => {
 	switch (anchor) {
-		case "center":
-			return "translate(-50%, -50%)";
+		case "top-left":
+			return "translate(0, 0)";
 		case "top-right":
 			return "translate(-100%, 0)";
 		case "bottom-left":
@@ -57,8 +57,10 @@ export const anchorTransform = (anchor: string | null | undefined): string => {
 			return "translate(0, -50%)";
 		case "center-right":
 			return "translate(-100%, -50%)";
+		case "center":
 		default:
-			return "";
+			// Default to center if unspecified, as LLM typically uses 50% / 50% expects centering
+			return "translate(-50%, -50%)";
 	}
 };
 

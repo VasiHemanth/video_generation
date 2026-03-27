@@ -434,6 +434,27 @@ export const ElementRenderer = ({
 		height,
 	});
 
+	// Provide sensible default sizes for elements that require explicit bounds
+	let defaultWidth = layoutStyle.width;
+	let defaultHeight = layoutStyle.height;
+
+	if (!element.size) {
+		if (element.type === "device") {
+			defaultWidth = 400;
+			defaultHeight = element.props.variant === "phone" ? 800 : 250;
+		} else if (element.type === "shape") {
+			defaultWidth = 200;
+			defaultHeight = 200;
+		} else if (element.type === "progress") {
+			defaultWidth = 600;
+			defaultHeight = 24;
+		} else if (element.type === "divider") {
+			const orient = typeof element.props.orientation === "string" ? element.props.orientation : "horizontal";
+			if (orient === "horizontal") defaultWidth = 600;
+			else defaultHeight = 600;
+		}
+	}
+
 	const rotation = keyframedValue({
 		initial: element.rotation ?? 0,
 		keyframes: element.keyframes
@@ -480,6 +501,8 @@ export const ElementRenderer = ({
 	const sharedStyle: CSSProperties = {
 		position: "absolute",
 		...layoutStyle,
+		width: defaultWidth,
+		height: defaultHeight,
 		opacity: merged.opacity,
 		perspective: has3D ? "1000px" : undefined,
 		transform: `${layoutStyle.transform ?? ""} translate(${totalTranslateX}px, ${totalTranslateY}px) rotate(${merged.rotate}deg) scale(${merged.scale})${rotateY3D}`,
