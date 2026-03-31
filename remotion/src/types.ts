@@ -56,8 +56,8 @@ export const positionSchema = z.object({
 });
 
 export const sizeSchema = z.object({
-	width: z.union([z.number(), z.string()]),
-	height: z.union([z.number(), z.string()]),
+	width: z.union([z.number(), z.string()]).nullable().optional(),
+	height: z.union([z.number(), z.string()]).nullable().optional(),
 });
 
 export const transitionConfigSchema = z.object({
@@ -106,12 +106,60 @@ export const elementTypeSchema = z.enum([
 	"svg-icon",
 ]);
 
-export const elementSchema = z.object({
+export const flexLayoutSchema = z.object({
+	display: z.enum(["flex", "grid"]).default("flex"),
+	flexDirection: z.enum([
+		"row", "column", "row-reverse", "column-reverse"
+	]).default("column"),
+	alignItems: z.enum([
+		"flex-start", "center", "flex-end", "stretch"
+	]).default("flex-start"),
+	justifyContent: z.enum([
+		"flex-start", "center", "flex-end", "space-between", "space-around"
+	]).default("flex-start"),
+	gap: z.number().default(0),
+	padding: z.union([z.number(), z.string()]).nullable().optional(),
+	flexWrap: z.enum(["nowrap", "wrap"]).default("nowrap"),
+});
+
+// Default MUST be "absolute" for backward compatibility with all existing IRs
+export const positioningSchema = z.enum(["flow", "absolute"]).default("absolute");
+
+export type Element = {
+	id: string;
+	type: z.infer<typeof elementTypeSchema>;
+	props: Record<string, unknown>;
+	position?: { x?: number | string; y?: number | string } | null;
+	size?: { width?: number | string | null; height?: number | string | null } | null;
+	positioning: "flow" | "absolute";
+	layout?: z.infer<typeof flexLayoutSchema> | null;
+	children?: Element[] | null;
+	anchor?: string | null;
+	layer: number;
+	opacity: number;
+	rotation: number;
+	scale: number;
+	enter?: z.infer<typeof animationSchema> | null;
+	exit?: z.infer<typeof animationSchema> | null;
+	emphasis?: z.infer<typeof animationSchema> | null;
+	keyframes: z.infer<typeof keyframeSchema>[];
+	delay?: number | null;
+	parallax_factor?: number | null;
+	ambient?: Record<string, unknown> | null;
+	stagger_index?: number | null;
+	stagger_delay?: number | null;
+	word_animation?: string | null;
+	word_stagger?: number | null;
+};
+
+const baseElementSchema = z.object({
 	id: z.string(),
 	type: elementTypeSchema,
 	props: z.record(z.string(), z.unknown()),
-	position: positionSchema,
+	position: positionSchema.nullable().optional(),
 	size: sizeSchema.nullable().optional(),
+	positioning: positioningSchema,
+	layout: flexLayoutSchema.nullable().optional(),
 	anchor: z.string().nullable().optional(),
 	layer: z.number(),
 	opacity: z.number().default(1),
@@ -128,6 +176,10 @@ export const elementSchema = z.object({
 	stagger_delay: z.number().nullable().optional(),
 	word_animation: z.string().nullable().optional(),
 	word_stagger: z.number().nullable().optional(),
+});
+
+export const elementSchema: z.ZodType<Element> = baseElementSchema.extend({
+	children: z.lazy(() => z.array(elementSchema)).nullable().optional(),
 });
 
 export const sceneSchema = z.object({
@@ -218,7 +270,8 @@ export const projectIrSchema = z.object({
 
 export type ProjectIR = z.infer<typeof projectIrSchema>;
 export type Scene = z.infer<typeof sceneSchema>;
-export type Element = z.infer<typeof elementSchema>;
+// export type Element = z.infer<typeof elementSchema>; // Already declared above explicitly
 export type Theme = z.infer<typeof themeSchema>;
 export type Animation = z.infer<typeof animationSchema>;
 export type TransitionConfig = z.infer<typeof transitionConfigSchema>;
+export type FlexLayout = z.infer<typeof flexLayoutSchema>;

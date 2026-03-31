@@ -66,7 +66,7 @@ pnpm install --ignore-workspace
 pnpm run render:sample
 
 cd agents
-./.venv/bin/uvicorn video_gen_agents.api.main:app --reload
+uv run python -m uvicorn video_gen_agents.api.main:app --reload
 
 cd dashboard
 pnpm install --ignore-workspace

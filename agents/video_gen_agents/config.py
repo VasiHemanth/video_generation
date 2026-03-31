@@ -43,6 +43,9 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        from dotenv import load_dotenv
+        load_dotenv()
+
         agents_root = Path(__file__).resolve().parents[1]
         repo_root = agents_root.parent
 

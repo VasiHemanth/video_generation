@@ -23,7 +23,14 @@ import type {
   ProjectDetail,
   ProjectProgressEvent,
   ProjectSummary,
+  Scene,
 } from "./types";
+import {TimelinePanel} from "./components/TimelinePanel";
+import {ExportPanel} from "./components/ExportPanel";
+import {CanvasEditor} from "./components/CanvasEditor";
+import {MotionTokenEditor} from "./components/MotionTokenEditor";
+import {HistoryPanel} from "./components/HistoryPanel";
+import {AssetManager} from "./components/AssetManager";
 
 type ActiveTab = "overview" | "logs" | "ir";
 type SocketState = "idle" | "connecting" | "live" | "closed" | "error";
@@ -812,8 +819,59 @@ function App() {
                     <strong>{selectedProject.render_path ? "IR + MP4" : "IR only"}</strong>
                   </div>
                 </div>
+
+                {/* Dashboard Actions — shown when IR is present */}
+                {selectedProject.ir?.timeline?.scenes && (
+                  <div style={{marginTop: "24px", display: "flex", flexDirection: "column", gap: "16px"}}>
+                    <ExportPanel 
+                      projectId={selectedProject.project_id}
+                      currentTheme={selectedProject.theme_name}
+                      onMutationComplete={() => void loadProjectDetail(selectedProject.project_id)}
+                    />
+                    <HistoryPanel
+                      projectId={selectedProject.project_id}
+                      onRestoreComplete={() => void loadProjectDetail(selectedProject.project_id)}
+                    />
+                    <AssetManager
+                      projectId={selectedProject.project_id}
+                      assets={selectedProject.ir.assets}
+                      onMutationComplete={() => void loadProjectDetail(selectedProject.project_id)}
+                    />
+                  </div>
+                )}
               </aside>
             </div>
+
+            {/* Timeline Panel — shown when IR scenes are available */}
+            {selectedProject.ir?.timeline?.scenes &&
+              selectedProject.ir.timeline.scenes.length > 0 ? (
+              <>
+                <TimelinePanel
+                  projectId={selectedProject.project_id}
+                  scenes={selectedProject.ir.timeline.scenes as Scene[]}
+                  totalDuration={selectedProject.duration}
+                  renderPath={selectedProject.render_path ?? null}
+                  onRerenderRequested={() => void loadProjectDetail(selectedProject.project_id)}
+                />
+                {selectedProject.ir.theme?.colors && selectedProject.ir.meta && (
+                  <CanvasEditor
+                    projectId={selectedProject.project_id}
+                    scenes={selectedProject.ir.timeline.scenes as any}
+                    irWidth={selectedProject.ir.meta.width}
+                    irHeight={selectedProject.ir.meta.height}
+                    themeColors={selectedProject.ir.theme.colors as any}
+                    onMutationComplete={() => void loadProjectDetail(selectedProject.project_id)}
+                  />
+                )}
+                {selectedProject.ir.theme?.motion && (
+                  <MotionTokenEditor
+                    projectId={selectedProject.project_id}
+                    motion={selectedProject.ir.theme.motion as any}
+                    onMutationComplete={() => void loadProjectDetail(selectedProject.project_id)}
+                  />
+                )}
+              </>
+            ) : null}
 
             <section className="panel tab-panel">
               <div className="tab-strip">

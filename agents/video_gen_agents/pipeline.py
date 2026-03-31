@@ -52,6 +52,8 @@ from .models import (
     SceneLayout,
     Script,
     ScriptBeat,
+    ContentSlots,
+    ContentSlot,
     SFXEvent,
     Size,
     StoryboardScene,
@@ -1189,86 +1191,73 @@ class VideoGenerationService:
         self._checkpoint({**state, **res}, "scriptwriter", ["script", "storyboard"])
         return res
 
+    def _merge_content_into_template(self, layout: SceneLayout, slots: ContentSlots) -> SceneLayout:
+        import copy
+        merged = copy.deepcopy(layout)
+        overrides = {s.element_id_ref: s.props_override for s in slots.slots}
+
+        def _apply_recursive(el: Element) -> None:
+            if el.id in overrides:
+                el.props.update(overrides[el.id])
+            if el.children:
+                for child in el.children:
+                    _apply_recursive(child)
+                    
+        for element in merged.elements:
+            _apply_recursive(element)
+            
+        return merged
+
     async def _design_scene(
         self, 
         scene: StoryboardScene, 
+        base_layout: SceneLayout,
         theme: ThemeTokens, 
         config: RunnableConfig
 ) -> SceneLayout:
-        """Process a single scene layout with LLM design logic."""
+        """Process a single scene refining content props without touching geometry."""
         model = build_resilient_model(self.settings, temperature=0.7)
+        
+        # Build prompt using the layout template
+        template_dump = base_layout.model_dump(include={'elements'})
         prompt = (
-            "You are a Premium Motion Graphics Designer creating high-end educational video scenes.\n\n"
-            f"Scene: {scene.description}\n"
-            f"Role: {scene.role}\n"
-            f"Duration: {scene.duration}s\n"
-            f"Theme: {json.dumps(theme.colors.model_dump())}\n\n"
-            "AVAILABLE ELEMENT TYPES:\n"
-            "- text: props={content, style_token, color, align, max_width, word_animation, word_stagger}\n"
-            "  TYPOGRAPHY TOKENS: display_lg, display_md, display_sm, heading_lg, heading_md, body_lg, body_md, caption, code\n"
-            "- shape: props={shape:'circle'|'rounded-rect'|'triangle', fill, stroke, corner_radius, glassmorphism:true}\n"
-            "- device: props={variant:'browser'|'phone', color, depth_3d:true}\n"
-            "- counter: props={from, to, prefix, suffix, style_token, color, format}\n"
-            "- progress: props={variant, value, max, color, track_color, thickness, label}\n"
-            "- particle-field: props={count, color, size_range:[2,5], speed, opacity}\n"
-            "- divider: props={orientation, thickness, color}\n"
-            "- svg-path: props={path_data:'M x y Q cx cy ex ey', stroke_color, stroke_width, stroke_dash:'12 8', draw_duration:0.8, draw_delay:0}\n"
-            "- svg-icon: props={icon_name, color, size:32} — icons: checkmark, arrow_right, arrow_down, document, calendar, folder, link, code, star, gear, lightning, chart_bar\n\n"
-            "ANIMATION PROPS (add to any element's props):\n"
-            "- word_animation:'word-by-word' + word_stagger:0.04 — for text reveals\n"
-            "- glassmorphism:true — frosted glass effect on shapes\n"
-            "- ambient:{type:'float', amplitude:4, frequency:0.3, phase:0} — organic drift\n"
-            "- stagger_index:0,1,2 + stagger_delay:0.12 — cascading entry within groups\n"
-            "- depth_3d:true — perspective depth effect on device/cards\n"
-            "- parallax_factor:0.1 — scroll-parallax depth on background elements\n\n"
-            "LAYOUT PATTERNS:\n"
-            "- centered_hero: Single headline + subtitle, accent shapes\n"
-            "- card_stack: 2-3 cards stacking vertically with stagger + svg-icons\n"
-            "- terminal_demo: Browser frame with typed commands\n"
-            "- list_reveal: Rows appearing one by one via stagger\n"
-            "- connection_graph: Two cards connected by svg-path arc\n"
-            "- split_layout: Headline left, device mockup right\n\n"
+            "You are a Content Editor. You are given a perfectly styled layout template.\n"
+            f"Scene Description: {scene.description}\n"
+            f"Role: {scene.role}\n\n"
+            "TEMPLATE ELEMENTS:\n"
+            f"{json.dumps(template_dump, indent=2)}\n\n"
+            "TASK: Create a ContentSlots JSON object that overrides ONLY the 'props' (content text, colors, icons) of the elements to make them fit the Scene Description perfectly.\n"
+            "RULES:\n"
+            "- You CANNOT change coordinates, alignment, sizes, or flex box parameters.\n"
+            "- You CANNOT add or remove elements.\n"
+            "- ONLY override values inside the `props` dictionary for a given `element_id_ref`.\n"
+            "- DO NOT override something if the default template value works fine.\n"
+            "- Use theme token names: 'accent_1', 'bg_primary', 'fg_primary', 'surface', etc.\n"
+            "- Make text concise and punchy.\n\n"
             "JSON STRUCTURE (STRICTLY FOLLOW THIS):\n"
             "{\n"
-            '  "scene_id": "' + scene.scene_id + '",\n'
-            '  "background": { "type": "gradient"|"animated-gradient"|"solid", "colors": ["bg_primary", "surface"], "angle": 120 },\n'
-            '  "elements": [\n'
+            f'  "scene_id": "{scene.scene_id}",\n'
+            '  "slots": [\n'
             '    {\n'
-            '      "id": "element_name",\n'
-            '      "type": "text|shape|device|svg-path|svg-icon|...",\n'
-            '      "props": { ... },\n'
-            '      "position": { "x": "50%", "y": "40%" },\n'
-            '      "layer": 1\n'
+            '      "element_id_ref": "scene_001_headline",\n'
+            '      "props_override": { "content": "Better Tool", "color": "fg_primary" }\n'
             '    }\n'
             '  ]\n'
-            "}\n\n"
-            "RULES:\n"
-            "- Use word_animation:'word-by-word' on ALL text elements\n"
-            "- Add ambient:{type:'float', amplitude:4, frequency:0.3} to decorative elements (at top-level)\n"
-            "- Add parallax_factor:0.1 to background elements (layer 1-2, at top-level)\n"
-            "- Add stagger_index:0,1,2 and stagger_delay:0.12 to elements within a sequence (at top-level)\n"
-            "- background.colors MUST be a list of 1-3 theme token names (e.g. ['bg_primary', 'surface'])\n"
-            "- NEVER add extra fields like 'direction' or 'parallax_factor' to the background object\n"
-            "- Maximum 5-6 elements per scene for visual clarity\n"
-            "- Use theme token names: 'accent_1', 'bg_primary', 'fg_primary', 'surface', etc.\n"
-            "- Layers must be unique (1, 2, 3...)\n\n"
-            'Return ONLY a JSON object: {"scene_id": "' + scene.scene_id + '", "background": {"type":"...", "colors":["..."], "angle":120}, "elements": [...]}\n'
-            "Element structure: {\"id\":\"...\", \"type\":\"...\", \"props\":{...}, \"position\":{\"x\":\"...\", \"y\":\"...\"}, \"layer\":1, \"parallax_factor\":0.1, \"ambient\":{...}, \"stagger_index\":0}"
+            "}\n"
         )
         
         try:
-            # We use a wrapper with healing logic (implemented below)
-            parsed = await self._extract_json_with_healing(
+            slots = await self._extract_json_with_healing(
                 model, 
                 prompt, 
-                expected_type=SceneLayout,
+                expected_type=ContentSlots,
                 config=config
             )
-            return parsed
+            # Merge slots into template
+            return self._merge_content_into_template(base_layout, slots)
         except Exception as e:
             logger.error("Per-scene Design Fallback", scene_id=scene.scene_id, error=str(e))
-            # Default fallback for this specific scene
-            return build_layouts_v2([scene], [], theme)[0]
+            return base_layout
 
     async def _motion_scene(
         self, 
@@ -1380,16 +1369,17 @@ class VideoGenerationService:
         )
 
         theme = load_theme(state["request"].theme_name, self.settings)
+        base_layouts = build_layouts_v2(state["storyboard"], state["script"].beats, theme)
         
         # Parallel Execution for Designing Scenes
-        tasks = [self._design_scene(s, theme, config) for s in state["storyboard"]]
+        tasks = [self._design_scene(s, base_layouts[i], theme, config) for i, s in enumerate(state["storyboard"])]
         
         try:
             layouts = await asyncio.gather(*tasks)
-            msg = f"Created {len(layouts)} scene layouts in parallel using Resilient LLM Router."
+            msg = f"Created {len(layouts)} scene layouts mapping content to templates."
         except Exception as e:
             logger.error("Parallel Design Node Failed", error=str(e))
-            layouts = build_layouts_v2(state["storyboard"], state["script"].beats, theme)
+            layouts = base_layouts
             msg = f"Created {len(layouts)} scene layouts (Node fallback, v2 engine)."
 
         agent_logs = _append_log(
@@ -1719,7 +1709,38 @@ class VideoGenerationService:
             except Exception:
                 pass  # Fallback to passed if LLM fails
 
+        # 3. Vision Verifier: aspect ratio check against rendered output
+        render_path = state.get("render_path")
+        if render_path:
+            try:
+                import subprocess as _sp
+                probe = _sp.run(
+                    [
+                        "ffprobe", "-v", "quiet",
+                        "-select_streams", "v:0",
+                        "-show_entries", "stream=width,height",
+                        "-of", "csv=p=0",
+                        str(Path(render_path)),
+                    ],
+                    capture_output=True, text=True, check=False
+                )
+                if probe.stdout.strip():
+                    parts = probe.stdout.strip().split(",")
+                    if len(parts) == 2:
+                        w, h = int(parts[0]), int(parts[1])
+                        if w != ir.meta.width or h != ir.meta.height:
+                            warnings.append(VerificationIssue(
+                                check="aspect_ratio",
+                                message=(
+                                    f"Rendered frame is {w}\u00d7{h} but IR meta specifies "
+                                    f"{ir.meta.width}\u00d7{ir.meta.height}."
+                                ),
+                            ))
+            except Exception:
+                pass  # Vision checks are non-fatal
+
         status: Literal["passed", "passed_with_warnings", "failed"] = "passed"
+
         if errors:
             status = "failed"
         elif warnings:

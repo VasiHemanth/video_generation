@@ -13,6 +13,35 @@ Use it alongside:
 3. Reference concrete files or directories when possible.
 4. Do not log planned work here unless it has already been committed or created locally.
 
+### 2026-03-30
+
+**Phase 3 SVG Components, Groq Migration, and Flexbox Engine**
+
+Added/Modified:
+- Replaced Cerebras LangGraph fallback setup with exclusively Groq LLM model endpoints.
+- Implemented Phase 3 animation features (spring, staggering, extended easing metrics).
+- Added `group` elements with recursive Flexbox rendering support in `ElementRenderer.tsx`.
+- Updated `random.html` to mimic a recursive layout parser.
+
+**Phase 4: Canvas, Deterministic Edits & Scale — Initial Sprint**
+
+Added:
+- `agents/video_gen_agents/ir_mutations.py` — Deterministic IR patch engine with 6 op types (`set_theme_color`, `set_scene_duration`, `reorder_scenes`, `set_element_prop`, `set_aspect_ratio`, `swap_theme`). All ops are immutable — they return a new IR without mutating the original.
+- `agents/video_gen_agents/export_presets.py` — Platform export preset system. Defines 6 platform configurations (YouTube Shorts, YouTube Long, Instagram Reels, TikTok, LinkedIn, Twitter) and generates the IR patch ops needed to conform a project to that platform's aspect ratio and duration cap.
+- `agents/video_gen_agents/api/main.py` — 4 new REST endpoints: `PATCH /api/projects/{id}/ir`, `POST /api/projects/{id}/re-render`, `GET /api/export/presets`, `POST /api/projects/{id}/export/{platform}`.
+- `agents/video_gen_agents/rendering.py` — `extract_verification_frames()` extracts one representative frame per scene (at 25% into each scene) using FFmpeg `-ss`. Called non-fatally after every render.
+- `dashboard/src/components/TimelinePanel.tsx` — Horizontal filmstrip scene editor with native HTML5 drag-and-drop reordering, inline duration editing (calls `PATCH /ir`), and a Re-render button (calls `POST /re-render`). Wired into `App.tsx`.
+- `dashboard/src/styles.css` — Timeline Panel styles (filmstrip, draggable cards, role color pills, duration badge, drag-over highlight).
+
+Modified:
+- `agents/video_gen_agents/pipeline.py` (_verify_node) — Added Vision Verifier: uses `ffprobe` to check rendered output dimensions against `meta.width × meta.height`. Non-fatal — verification warnings don't block the pipeline.
+- `docs/ROADMAP.md` — Phase 3 marked ✅, Phase 4 marked 🚧 with the implemented items listed.
+- `dashboard/src/types.ts` — Exported `Scene` as a standalone type (previously inlined in `ProjectIR`).
+
+Tests:
+- `agents/tests/test_ir_mutations.py` — 12 tests covering all 6 ops and chained multi-op patterns. All 12 pass.
+
+
 ### 2026-03-23
 
 **Galileo Integration for Agentic Flow Tracing**

@@ -6,6 +6,7 @@ import math
 import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic.alias_generators import to_camel
 
 
 HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})$")
@@ -135,14 +136,28 @@ class Keyframe(StrictModel):
     easing: str | None = None
 
 
+class FlexLayout(StrictModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+    display: Literal["flex", "grid"] = "flex"
+    flex_direction: Literal["row", "column", "row-reverse", "column-reverse"] = "column"
+    align_items: Literal["flex-start", "center", "flex-end", "stretch"] = "flex-start"
+    justify_content: Literal["flex-start", "center", "flex-end", "space-between", "space-around"] = "flex-start"
+    gap: float = 0
+    padding: float | str | None = None
+    flex_wrap: Literal["nowrap", "wrap"] = "nowrap"
+
+
 class Element(StrictModel):
     id: str
     type: str
-    props: dict[str, Any]
-    position: Position
+    props: dict[str, Any] = Field(default_factory=dict)
+    position: Position | None = None
     size: Size | None = None
+    positioning: Literal["flow", "absolute"] = "absolute"
+    layout: FlexLayout | None = None
+    children: list["Element"] | None = None
     anchor: str | None = None
-    layer: int
+    layer: int = 0
     opacity: float = 1.0
     rotation: float = 0.0
     scale: float = 1.0
@@ -174,7 +189,6 @@ class Element(StrictModel):
             "counter": {"from", "to", "style_token", "color"},
             "code-block": {"code", "language"},
             "particle-field": {"count", "color"},
-            "group": {"layout", "children"},
             "divider": {"orientation", "color"},
             "svg-path": {"path_data", "stroke_color", "stroke_width"},
             "svg-icon": {"icon_name", "color"},
@@ -417,6 +431,16 @@ class StoryboardScene(StrictModel):
     visual_style: str = ""  # For designer context
 
 
+class ContentSlot(StrictModel):
+    element_id_ref: str
+    props_override: dict[str, Any]
+
+
+class ContentSlots(StrictModel):
+    scene_id: str
+    slots: list[ContentSlot]
+
+
 class SceneLayout(StrictModel):
     scene_id: str
     background: BackgroundConfig
@@ -569,3 +593,5 @@ class StoredProjectDetail(StoredProjectSummary):
     summary: PipelineSummary | None = None
     verification: VerificationResult | None = None
     logs: list[AgentLogEntry] = Field(default_factory=list)
+
+Element.model_rebuild()

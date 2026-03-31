@@ -727,3 +727,425 @@ textarea {
     flex-direction: column;
   }
 }
+
+/* ── Timeline Panel ──────────────────────────────────────────────────────── */
+
+.timeline-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+}
+
+.timeline-duration-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.06em;
+}
+
+.timeline-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  min-height: 110px;
+  scroll-snap-type: x mandatory;
+}
+
+.timeline-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 80px;
+  padding: 12px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(20, 32, 43, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  cursor: grab;
+  scroll-snap-align: start;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+  user-select: none;
+}
+
+.timeline-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(20, 32, 43, 0.12);
+}
+
+.timeline-card.dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.timeline-card.drag-over {
+  box-shadow: 0 0 0 2px var(--accent), 0 12px 28px rgba(244, 93, 72, 0.18);
+}
+
+.timeline-card.selected {
+  box-shadow: 0 0 0 2px var(--cool), 0 12px 28px rgba(6, 134, 216, 0.18);
+}
+
+.timeline-role {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.timeline-title {
+  flex: 1;
+  font-size: 0.78rem;
+  color: var(--ink-strong);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.timeline-dur {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.timeline-dur-edit {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.timeline-dur-edit input {
+  width: 56px;
+  padding: 4px 6px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(6, 134, 216, 0.4);
+  background: rgba(255, 255, 255, 0.95);
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.timeline-dur-edit button {
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--cool);
+  color: white;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+@media (max-width: 800px) {
+  .timeline-strip {
+    min-height: 90px;
+  }
+
+  .timeline-card {
+    padding: 9px 8px;
+  }
+}
+
+/* ── Layout Canvas Editor ───────────────────────────────────────────── */
+
+.canvas-editor-panel {
+  margin-top: 16px;
+}
+
+.canvas-editor-panel .section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.canvas-scene-selector {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.scene-tab {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #d8dce2);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+  transition: all 0.15s ease;
+}
+
+.scene-tab.active {
+  background: #1c1c2e;
+  color: #fff;
+  border-color: #1c1c2e;
+}
+
+.scene-tab:hover:not(.active) {
+  background: #f0f0f5;
+}
+
+.canvas-container {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.canvas-viewport {
+  user-select: none;
+  touch-action: none;
+}
+
+.canvas-saving-indicator {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5BA8A0;
+  letter-spacing: 0.5px;
+  padding: 4px 0;
+  animation: canvasPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes canvasPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.canvas-element {
+  border-radius: 4px;
+  transition: box-shadow 0.1s ease;
+}
+
+.canvas-element:hover:not(.selected) {
+  box-shadow: 0 0 0 1px rgba(91, 168, 160, 0.5);
+}
+
+.canvas-element.selected {
+  box-shadow: 0 0 0 2px #5BA8A0;
+}
+
+.canvas-element-inner {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.canvas-text-preview {
+  display: flex;
+  align-items: center;
+}
+
+.canvas-generic-preview {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 4px;
+}
+
+.canvas-selection-outline {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid #5BA8A0;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 0 12px rgba(91, 168, 160, 0.3);
+}
+
+.canvas-element-label {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: #5BA8A0;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.canvas-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 2px solid #5BA8A0;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.canvas-handle-tl { top: -4px; left: -4px; cursor: nw-resize; }
+.canvas-handle-tr { top: -4px; right: -4px; cursor: ne-resize; }
+.canvas-handle-bl { bottom: -4px; left: -4px; cursor: sw-resize; }
+.canvas-handle-br { bottom: -4px; right: -4px; cursor: se-resize; }
+
+.canvas-info-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #f5f5fa;
+  border-radius: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.canvas-info-label {
+  font-weight: 600;
+  color: #1c1c2e;
+}
+
+.canvas-info-coord {
+  color: #6a6a80;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+}
+
+/* ── Motion Token Editor ────────────────────────────────────────────── */
+
+.motion-editor-panel {
+  margin-top: 16px;
+}
+
+.motion-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.motion-editor-card {
+  background: #f9f9fc;
+  border-radius: 10px;
+  border: 1px solid #e8e8f0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.motion-editor-card label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6a6a80;
+}
+
+.motion-editor-card .motion-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c1c2e;
+}
+
+.motion-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.motion-slider-row input[type="range"] {
+  flex: 1;
+  accent-color: #5BA8A0;
+  height: 4px;
+}
+
+.motion-slider-row .motion-slider-val {
+  min-width: 40px;
+  text-align: right;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: #1c1c2e;
+}
+
+.motion-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  gap: 8px;
+}
+
+/* ── Version History Panel ──────────────────────────────────────── */
+
+.history-panel {
+  margin-top: 16px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.history-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f9f9fc;
+  border: 1px solid #e8e8f0;
+  border-radius: 8px;
+  font-size: 11px;
+  transition: background 0.12s ease;
+}
+
+.history-entry:hover {
+  background: #f0f0fa;
+}
+
+.history-entry .history-ts {
+  font-family: "IBM Plex Mono", monospace;
+  color: #6a6a80;
+  font-size: 10px;
+}
+
+.history-entry .history-ops {
+  font-weight: 600;
+  color: #1c1c2e;
+}
+
+.history-entry button {
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.history-entry button:hover {
+  background: #5BA8A0;
+  color: #fff;
+  border-color: #5BA8A0;
+}

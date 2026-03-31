@@ -11,7 +11,7 @@
 |-------|--------|----------|
 | **Phase 1**: Foundation & LLM Fallback | ✅ Completed | ██████████ 100% |
 | **Phase 2**: Parallelization & Self-Correction | ✅ Completed | ██████████ 100% |
-| **Phase 3**: Motion Intelligence & SVG Components | 🚧 In Progress | ▓▓░░░░░░░░ 15% |
+| **Phase 3**: Motion Intelligence & SVG Components | ✅ Completed | ██████████ 100% |
 | **Phase 4**: Canvas & Deterministic Edits | 📋 Planned | ░░░░░░░░░░ 0% |
 
 ---
@@ -56,7 +56,7 @@
 ### 1.3 LangGraph Agent System
 | Agent | Status | Notes |
 |-------|--------|----------|
-| LLM service (Resilient Router) | ✅ | Cerebras (Primary) + Groq (Fallback) with 429 retry logic |
+| LLM service (Resilient Router) | ✅ | Groq (Primary) migrated, with 429 retry logic |
 | Manager Agent | ✅ | Brief → task plan + generation constraints |
 | Script & Storyboard Agent | ✅ | Deterministic beats + storyboard scenes |
 | Visual Design Agent | ✅ | Theme loading + per-scene layouts |
@@ -131,6 +131,9 @@
 ---
 
 ## Implemented Now
+
+- **Phase 3 additions**: SVG Components, advanced spring motion, extended easing, new scene layouts (`layouts.py`) and recursive Flexbox parsing.
+- **Groq Migration**: Replaced Cerebras LangGraph agents with Groq client routing.
 
 - `agents/video_gen_agents/models.py`: typed IR, planning, verification, and API models
 - `agents/video_gen_agents/themes.py`: shared theme loading from `shared/themes/`

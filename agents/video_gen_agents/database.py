@@ -303,3 +303,66 @@ class Database:
                 for entry in logs
             ],
         )
+
+    async def save_ir_mutation(self, project_id: str, ir: ProjectIR, op_summary: str) -> None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                project = await session.scalar(
+                    select(ProjectRecord).where(ProjectRecord.project_id == project_id)
+                )
+                if project is not None:
+                    project.ir_json = ir.model_dump(mode="json", by_alias=True)
+                    project.updated_at = utc_now()
+
+                session.add(
+                    ProjectCheckpoint(
+                        project_id=project_id,
+                        step_name=op_summary,
+                        state_snapshot=ir.model_dump(mode="json", by_alias=True),
+                    )
+                )
+
+    async def get_history(self, project_id: str) -> list[dict]:
+        async with self.session_factory() as session:
+            checkpoints = await session.scalars(
+                select(ProjectCheckpoint)
+                .where(ProjectCheckpoint.project_id == project_id)
+                .order_by(ProjectCheckpoint.timestamp.desc())
+            )
+            return [
+                {
+                    "id": c.id,
+                    "step_name": c.step_name,
+                    "timestamp": c.timestamp.isoformat(),
+                }
+                for c in checkpoints.all()
+            ]
+
+    async def restore_ir(self, project_id: str, checkpoint_id: int) -> ProjectIR | None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                checkpoint = await session.scalar(
+                    select(ProjectCheckpoint)
+                    .where(
+                        ProjectCheckpoint.id == checkpoint_id,
+                        ProjectCheckpoint.project_id == project_id,
+                    )
+                )
+                if checkpoint is None:
+                    return None
+
+                project = await session.scalar(
+                    select(ProjectRecord).where(ProjectRecord.project_id == project_id)
+                )
+                if project is not None:
+                    project.ir_json = checkpoint.state_snapshot
+                    project.updated_at = utc_now()
+
+                session.add(
+                    ProjectCheckpoint(
+                        project_id=project_id,
+                        step_name=f"Restored from version {checkpoint_id}",
+                        state_snapshot=checkpoint.state_snapshot,
+                    )
+                )
+                return ProjectIR.model_validate(checkpoint.state_snapshot)

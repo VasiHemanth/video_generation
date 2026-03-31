@@ -8,7 +8,7 @@ import {
 } from "remotion";
 
 import {getAnimationStyle, keyframedValue, mergeAnimationStyles} from "../lib/animations";
-import {positionStyle, resolvePixelValue} from "../lib/geometry";
+import {anchorTransform, resolveLength, resolvePixelValue} from "../lib/geometry";
 import {renderSvgIcon, renderSvgPath} from "./SvgRenderer";
 import type {Element, Theme} from "../types";
 
@@ -387,9 +387,11 @@ const renderUnsupported = (element: Element, theme: Theme) => {
 export const ElementRenderer = ({
 	element,
 	theme,
+	isChild = false,
 }: {
 	element: Element;
 	theme: Theme;
+	isChild?: boolean;
 }) => {
 	const frame = useCurrentFrame();
 	const {fps, durationInFrames, width, height} = useVideoConfig();
@@ -429,10 +431,23 @@ export const ElementRenderer = ({
 		totalDurationInFrames: durationInFrames,
 	});
 
-	const layoutStyle = positionStyle(element.position, element.size, element.anchor, {
-		width,
-		height,
-	});
+	const isAbsolute = element.positioning === "absolute";
+
+	const layoutStyle: CSSProperties = isAbsolute ? {
+		position: "absolute",
+		left: element.position ? resolveLength(element.position.x, width) : 0,
+		top: element.position ? resolveLength(element.position.y, height) : 0,
+		...(element.size ? {
+			width: resolveLength(element.size.width, width),
+			height: resolveLength(element.size.height, height),
+		} : {}),
+		transform: element.anchor ? anchorTransform(element.anchor) : "translate(-50%, -50%)",
+	} : {
+		...(element.size ? {
+			width: resolveLength(element.size.width, width),
+			height: resolveLength(element.size.height, height),
+		} : {}),
+	};
 
 	// Provide sensible default sizes for elements that require explicit bounds
 	let defaultWidth = layoutStyle.width;
@@ -499,7 +514,6 @@ export const ElementRenderer = ({
 	const rotateY3D = has3D ? " rotateY(2deg)" : "";
 
 	const sharedStyle: CSSProperties = {
-		position: "absolute",
 		...layoutStyle,
 		width: defaultWidth,
 		height: defaultHeight,
@@ -516,6 +530,34 @@ export const ElementRenderer = ({
 				? `inset(0 ${100 - merged.clipProgress * 100}% 0 0)`
 				: undefined,
 	};
+
+	if (element.type === "group" && element.layout) {
+		const { display, flexDirection, alignItems, justifyContent, gap, padding, flexWrap } = element.layout;
+		const children = element.children || [];
+		return (
+			<div
+				style={{
+					...sharedStyle,
+					display,
+					flexDirection,
+					gap,
+					// @ts-ignore
+					padding: padding !== undefined ? padding : 0,
+					// @ts-ignore
+					alignItems,
+					// @ts-ignore
+					justifyContent,
+					flexWrap,
+					background: element.props.fill ? resolveColor(element.props.fill, theme) : undefined,
+					borderRadius: typeof element.props.corner_radius === 'number' ? element.props.corner_radius : undefined,
+				}}
+			>
+				{children.map((child: Element) => (
+					<ElementRenderer key={child.id} element={child} theme={theme} isChild />
+				))}
+			</div>
+		);
+	}
 
 	if (element.type === "particle-field") {
 		return (

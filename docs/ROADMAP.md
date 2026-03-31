@@ -45,7 +45,7 @@
 
 ---
 
-## Phase 3 — Motion Intelligence, SVG Components & Scene Templates 🚧
+## Phase 3 — Motion Intelligence, SVG Components & Scene Templates ✅
 
 **Goal**: Professional motion design quality through animation upgrades, dynamic SVG system, and prompt enrichment.
 
@@ -71,9 +71,16 @@
 
 ---
 
-## Phase 3 — Canvas, Deterministic Edits & Scale 📋
+## Phase 4 — Canvas, Deterministic Edits & Scale 🚧
 
 **Goal**: Visual editing UI, non-LLM edits, production readiness
+
+### Implemented So Far (Phase 4)
+- [x] **IR Mutation API** (`ir_mutations.py`): deterministic ops for color, duration, reorder, aspect ratio, theme swap
+- [x] **Re-render endpoint** (`POST /api/projects/{id}/re-render`): queue Remotion render from stored IR
+- [x] **Export Presets** (`export_presets.py` + `POST /api/projects/{id}/export/{platform}`): YouTube, Instagram, TikTok, LinkedIn, Twitter
+- [x] **Dashboard Timeline Panel** (`TimelinePanel.tsx`): drag-and-drop scene reordering + inline duration editor
+- [x] **Vision Verifier** (`rendering.py`): per-scene frame extraction + aspect ratio guard in verifier node
 
 ### Features
 

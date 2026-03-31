@@ -14,9 +14,12 @@ import uvicorn
 
 from ..config import Settings
 from ..database import Database
+from ..export_presets import build_export_patch, list_presets
+from ..ir_mutations import IRPatch, apply_patch
 from ..models import (
     GenerateVideoRequest,
     GenerateVideoResponse,
+    ProjectIR,
     ProjectLaunchResponse,
     ProjectProgressEvent,
     StoredProjectDetail,
@@ -24,6 +27,7 @@ from ..models import (
 )
 from ..pipeline import VideoGenerationService
 from ..progress import ProgressBroker
+from ..rendering import render_project_ir
 
 
 @lru_cache(maxsize=1)
@@ -224,6 +228,129 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             pass
         finally:
             broker.unregister(project_id, queue)
+
+    # ── IR Mutation endpoint ───────────────────────────────────────────────
+    @app.patch("/api/projects/{project_id}/ir")
+    async def patch_ir(project_id: str, patch: IRPatch) -> dict:
+        project = await database.get_project(project_id)
+        if project is None or project.ir is None:
+            raise HTTPException(status_code=404, detail=f"Project IR for '{project_id}' not found.")
+        try:
+            ir = ProjectIR.model_validate(project.ir)
+            updated_ir = apply_patch(ir, patch)
+        except (ValueError, Exception) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        # Persist the updated IR back to JSON file and save to the database history
+        props_dir = resolved_settings.data_dir / "render-props"
+        props_dir.mkdir(parents=True, exist_ok=True)
+        (props_dir / f"{project_id}.json").write_text(
+            updated_ir.model_dump_json(indent=2, by_alias=True)
+        )
+        
+        op_summary = f"Applied {len(patch.ops)} op(s): " + ", ".join(op.op for op in patch.ops)
+        await database.save_ir_mutation(project_id, updated_ir, op_summary)
+
+        return {"status": "ok", "ir": updated_ir.model_dump(mode="json")}
+
+    @app.get("/api/projects/{project_id}/history")
+    async def get_project_history(project_id: str) -> list[dict]:
+        return await database.get_history(project_id)
+
+    @app.post("/api/projects/{project_id}/restore/{checkpoint_id}")
+    async def restore_project_ir(project_id: str, checkpoint_id: int) -> dict:
+        restored_ir = await database.restore_ir(project_id, checkpoint_id)
+        if restored_ir is None:
+            raise HTTPException(status_code=404, detail=f"Checkpoint {checkpoint_id} not found.")
+        
+        # Sync to disk
+        props_dir = resolved_settings.data_dir / "render-props"
+        props_dir.mkdir(parents=True, exist_ok=True)
+        (props_dir / f"{project_id}.json").write_text(
+            restored_ir.model_dump_json(indent=2, by_alias=True)
+        )
+        
+        return {"status": "ok", "ir": restored_ir.model_dump(mode="json")}
+
+    # ── Re-render endpoint ────────────────────────────────────────────────
+    @app.post("/api/projects/{project_id}/re-render", status_code=202)
+    async def re_render_project(project_id: str) -> dict:
+        project = await database.get_project(project_id)
+        if project is None or project.ir is None:
+            raise HTTPException(status_code=404, detail=f"Project IR for '{project_id}' not found.")
+
+        ir = ProjectIR.model_validate(project.ir)
+
+        async def _run_render() -> None:
+            try:
+                render_path = await run_in_threadpool(
+                    render_project_ir, settings=resolved_settings, ir=ir
+                )
+                broker.publish(
+                    ProjectProgressEvent(
+                        event="project_completed",
+                        project_id=project_id,
+                        stage="renderer",
+                        status="rendered",
+                        message="Re-render completed.",
+                        progress=1.0,
+                        timestamp=utc_now(),
+                        render_path=render_path,
+                    )
+                )
+            except Exception as exc:
+                broker.publish(
+                    ProjectProgressEvent(
+                        event="project_failed",
+                        project_id=project_id,
+                        stage="renderer",
+                        status="failed",
+                        message=str(exc),
+                        progress=1.0,
+                        timestamp=utc_now(),
+                    )
+                )
+
+        task = asyncio.create_task(_run_render())
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        return {"status": "accepted", "project_id": project_id}
+
+    # ── Export presets ────────────────────────────────────────────────────
+    @app.get("/api/export/presets")
+    def get_export_presets() -> dict:
+        return {"presets": list_presets()}
+
+    @app.post("/api/projects/{project_id}/export/{platform}", status_code=202)
+    async def export_to_platform(project_id: str, platform: str) -> dict:
+        project = await database.get_project(project_id)
+        if project is None or project.ir is None:
+            raise HTTPException(status_code=404, detail=f"Project IR for '{project_id}' not found.")
+        try:
+            ir = ProjectIR.model_validate(project.ir)
+            patch = build_export_patch(ir, platform)
+            patched_ir = apply_patch(ir, patch)
+        except (ValueError, Exception) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        # Kick off a re-render with the patched IR
+        async def _run_export() -> None:
+            try:
+                await run_in_threadpool(
+                    render_project_ir, settings=resolved_settings, ir=patched_ir
+                )
+            except Exception:
+                pass
+
+        task = asyncio.create_task(_run_export())
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        return {
+            "status": "accepted",
+            "project_id": project_id,
+            "platform": platform,
+            "patch_ops": len(patch.ops),
+        }
 
     return app
 

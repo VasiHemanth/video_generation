@@ -15,18 +15,19 @@ async def main():
 
     request = GenerateVideoRequest(
         brief=(
-            "Quantum Computing explained: Superposition and Entanglement. "
-            "1. Normal bits are 0 or 1. Qubits are both at once (Superposition). "
-            "2. Linking qubits across space (Entanglement). "
-            "3. Exponential power for complex problems."
+            "How a RAG System Works in detail. "
+            "1. Ingestion: Processing raw documents into clean text. "
+            "2. Chunking: Breaking the text into manageable semantic pieces. "
+            "3. Vectorization: Using an embedding model to convert chunks into dense vectors. "
+            "4. Hybrid Search: Combining keyword and semantic vector search to feed context to the LLM."
         ),
-        title="Quantum Power",
+        title="RAG Systems Explained",
         theme_name="warm-clay",
         aspect_ratio="9:16",
         duration=30,
         scene_count=4,
         platform="youtube",
-        render_video=True, # FULL RENDER
+        render_video=True,
     )
 
     project_id = f"sample_{int(time.time())}"
@@ -37,10 +38,7 @@ async def main():
 
     try:
         response = await service.generate(request, project_id, progress_callback)
-        print(f"\n✅ Sample Generation completed!")
-        print(f"   IR Path: {response.ir_path}")
-        print(f"   Video Path: {response.video_path}")
-        print(f"   Status: {response.verification.status}")
+        print(f"\n✅ Sample Generation completed for {project_id}!")
     except Exception as e:
         print(f"\n❌ Sample Generation failed: {type(e).__name__}: {e}")
         import traceback

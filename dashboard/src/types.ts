@@ -49,6 +49,24 @@ export interface ProjectSummary {
   updated_at: string;
 }
 
+export interface Scene {
+  id: string;
+  role: string;
+  title?: string | null;
+  start_time: number;
+  duration: number;
+  background: {
+    type: string;
+    colors: string[];
+  };
+  elements: Array<{
+    id: string;
+    type: string;
+    layer: number;
+    props: Record<string, unknown>;
+  }>;
+}
+
 export interface ProjectIR {
   version: string;
   meta: {
@@ -63,25 +81,15 @@ export interface ProjectIR {
     created_at: string;
     status: string;
   };
-  timeline: {
-    scenes: Array<{
-      id: string;
-      role: string;
-      title?: string | null;
-      start_time: number;
-      duration: number;
-      background: {
-        type: string;
-        colors: string[];
-      };
-      elements: Array<{
-        id: string;
-        type: string;
-        layer: number;
-        props: Record<string, unknown>;
-      }>;
-    }>;
+  theme?: {
+    colors: Record<string, string>;
+    motion: Record<string, any>;
+    [key: string]: any;
   };
+  timeline: {
+    scenes: Scene[];
+  };
+  assets?: Record<string, any[]>;
 }
 
 export interface ProjectDetail extends ProjectSummary {
@@ -134,4 +142,13 @@ export interface ProjectProgressEvent {
   timestamp: string;
   render_path?: string | null;
   verification_status?: string | null;
+}
+
+export interface ExportPreset {
+  slug: string;
+  label: string;
+  aspect_ratio: string;
+  width: number;
+  height: number;
+  max_duration: number | null;
 }
